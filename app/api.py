@@ -1,52 +1,39 @@
-from fastapi import FastAPI
+"""
+FastAPI application: exposes the chatbot over HTTP.
+"""
+import logging
+import os
+
+from contextlib import asynccontextmanager
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+
 from app.chatbot.engine import load_intents, get_response
 from app.chatbot.conversation import ConversationState
 from app.database.models import init_db, SessionLocal, User, Conversation, Message
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from contextlib import asynccontextmanager
-
-import logging
-import os
-from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(level = logging.INFO)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("chatbot_api")
 
-
-app = FastAPI(title="Student Assistant Chatbot API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # For development only - restrict this in production (Step 17)
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-intents = load_intents()
-
-active_states: dict[int, ConversationState] = {}
-
-class ChatRequest(BaseModel):
-    conversation_id: int | None = None
-    message: str = Field(..., min_length = 1, max_length = 500)
-
-class ChatResponse(BaseModel):
-    conversation_id: int
-    reply: str
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     yield
 
+
+app = FastAPI(title="Student Assistant Chatbot API", lifespan=lifespan)
+
+# --- CORS: only one middleware block, using the env var ---
 allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
 
 app.add_middleware(
@@ -56,12 +43,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app = FastAPI(title="Student Assistant Chatbot API", lifespan=lifespan)
-
+# --- Rate limiting ---
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+intents = load_intents()
+active_states: dict[int, ConversationState] = {}
+
+
+class ChatRequest(BaseModel):
+    conversation_id: int | None = None
+    message: str = Field(..., min_length=1, max_length=500)
+
+
+class ChatResponse(BaseModel):
+    conversation_id: int
+    reply: str
+
+
+# --- The ONE and only /chat route ---
 @app.post("/chat", response_model=ChatResponse)
 @limiter.limit("10/minute")
 def chat(request: Request, chat_request: ChatRequest):
@@ -106,21 +107,15 @@ def chat(request: Request, chat_request: ChatRequest):
 
     return ChatResponse(conversation_id=conversation_id_value, reply=reply)
 
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    # Log the FULL error internally for debugging...
     logger.error(f"Unhandled error on {request.url.path}: {exc}", exc_info=True)
-
-    # ...but return a GENERIC message to the user - never expose internals
     return JSONResponse(
         status_code=500,
         content={"detail": "Something went wrong. Please try again later."}
     )
 
-@app.post("/chat", response_model=ChatResponse)
-@limiter.limit("10/minute")  # max 10 messages per minute per IP
-def chat(request: Request, chat_request: ChatRequest):
-    ...
 
 @app.get("/")
 def root():
