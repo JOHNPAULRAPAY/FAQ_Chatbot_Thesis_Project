@@ -1,0 +1,34 @@
+{
+    "intents": [
+        {
+            "tag": "greeting",
+            "patterns": ["hi", "hello", "hey", "good morning", "good afternoon", "hiya", "is anyone there", "hello there", "greetings"],
+            "responses": ["Hello! I'm your student assistant. Ask me about admissions, tuition, or enrollment."]
+        },
+        {
+            "tag": "goodbye",
+            "patterns": ["bye", "exit", "quit", "goodbye", "thanks that's all", "end", "see you", "i have to go", "talk to you later"],
+            "responses": ["Goodbye! Good luck with your studies."]
+        },
+        {
+            "tag": "admission_requirements",
+            "patterns": ["requirements", "documents", "what do i need to enroll", "requirements for freshmen", "what papers do i need", "admission requirements", "what should i prepare to apply", "documents needed for admission"],
+            "responses": ["For admission, you'll typically need: Form 138, birth certificate, and a valid ID. Requirements may vary by program."]
+        },
+        {
+            "tag": "tuition_fees",
+            "patterns": ["tuition", "fee", "how much", "payment", "cost", "how much does it cost to study", "what are the fees", "payment plans", "is tuition expensive"],
+            "responses": ["Tuition fees vary by program. Please check with the Accounting Office for exact rates."]
+        },
+        {
+            "tag": "enrollment_process",
+            "patterns": ["enroll", "register", "how do i enroll", "steps to register", "how to sign up", "enrollment process", "where do i enroll", "online enrollment"],
+            "responses": ["To enroll, visit the Admissions Office with your requirements, or use the online enrollment portal."]
+        },
+        {
+            "tag": "fallback",
+            "patterns": [],
+            "responses": ["Sorry, I didn't quite understand that. Could you rephrase your question?"]
+        }
+    ]
+}

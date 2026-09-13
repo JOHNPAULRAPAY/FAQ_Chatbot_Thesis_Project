@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.env
+chatbot.db
+app/ml/model.pkl
+.pytest_cache/
