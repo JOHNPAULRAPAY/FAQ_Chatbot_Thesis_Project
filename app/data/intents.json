@@ -2,7 +2,7 @@
     "intents": [
         {
             "tag": "greeting",
-            "patterns": ["hi", "hello", "hey", "good morning", "good afternoon", "hiya", "is anyone there", "hello there", "greetings"],
+            "patterns": ["hi", "hello", "hey", "good morning", "good afternoon", "hiya", "is anyone there", "hello there", "greetings", "henlo"],
             "responses": ["Hello! I'm your student assistant. Ask me about admissions, tuition, or enrollment."]
         },
         {
@@ -10,10 +10,33 @@
             "patterns": ["bye", "exit", "quit", "goodbye", "thanks that's all", "end", "see you", "i have to go", "talk to you later"],
             "responses": ["Goodbye! Good luck with your studies."]
         },
-        {
+        {         
             "tag": "admission_requirements",
             "patterns": ["requirements", "documents", "what do i need to enroll", "requirements for freshmen", "what papers do i need", "admission requirements", "what should i prepare to apply", "documents needed for admission"],
-            "responses": ["For admission, you'll typically need: Form 138, birth certificate, and a valid ID. Requirements may vary by program."]
+            "responses": ["Admission requirements differ between Senior High School and College. Could you tell me which one you're asking about?"],
+            "level_responses": {
+                "Senior High School": [
+                    "Requirements for Enrollment in Senior High School",
+                    "JUNIOR HIGH SCHOOL / GRADE 10 COMPLETER / TRANSFEREE, you'll typically need:",
+                    "1. Uncancelled Report Card (Form 138)",
+                    "2. Secondary Student's Permanent Record (Form 137)",
+                    "3. Certificate of Good Moral Character",
+                    "4. Photocopy of Certificate of Completion / JHS Diploma",
+                    "5. ESC  Certificate (From Private School Only)",
+                    "6. Original Copy of PSA Birth Certificate",
+                    "7. 1pcs. 2x2 & 4 pcs. 1x1 colored ID Picture (White Background)"
+                ],
+                "College": [
+                    "Requirements for Enrollment in College",
+                    "SENIOR HIGH SCHOOL COMPLETER / TRANSFEREE, you'll typically need:",
+                    "1. Uncancelled Report Card (SF-9)",
+                    "2. Senior High School Permanent Record (SF-10)",
+                    "3. Certificate of Good Moral Character",
+                    "4. Photocopy of Certificate of Completion / SHS Diploma",
+                    "5. Original Copy of PSA Birth Certificate",
+                    "6. 1pcs. 2x2 & 4 pcs. 1x1 colored ID Picture (White Background)"
+                ]
+        }
         },
         {
             "tag": "tuition_fees",
@@ -23,8 +46,25 @@
         {
             "tag": "enrollment_process",
             "patterns": ["enroll", "register", "how do i enroll", "steps to register", "how to sign up", "enrollment process", "where do i enroll", "online enrollment"],
-            "responses": ["To enroll, visit the Admissions Office with your requirements, or use the online enrollment portal."]
+            "responses": ["To enroll, visit the Admissions Office with your requirements."]
         },
+        {
+            "tag": "document_request",
+            "patterns": ["document request", "credential request", "how to get requirement", "how to request", "how to get my documents", "how to get my credentials"],
+            "responses": [
+                "To request your documents, either email the ACLC Iriga campus or visit the school directly.\n\nHere are the costs for requesting your credentials:\nCertificate of Grades        500.00\nGood Moral                   50.00\nCertificate of Enrollment    50.00\nF137                         200.00\nF138                         200.00\nHonorable Dismissal          500.00\nTOR                          200.00\nDiploma (SHS)                500.00\nDiploma (College)            600.00"
+            ]
+        },
+        {
+            "tag": "program_info",
+            "patterns": ["what courses do you offer", "available courses", "list of programs", "what programs are available", "what can i take", "what courses are offered", "what strands do you have"],
+            "responses": ["placeholder - generated dynamically, see engine.py"]
+        },
+
+
+
+
+
         {
             "tag": "fallback",
             "patterns": [],

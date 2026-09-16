@@ -8,21 +8,19 @@ import os
 import random
 
 from app.chatbot.llm_layer import ask_llm
-from app.chatbot.entities import extract_program
+from app.chatbot.entities import extract_all_entities, list_available_options
 from app.chatbot.preprocessing import normalize_text
 from app.ml.classifier import load_model, predict_intent
-
-PROGRAM_AWARE_INTENTS = {"tuition_fees", "admission_requirements", "enrollment_process"}
 
 INTENTS_PATH = os.path.join(
     os.path.dirname(__file__), "..", "data", "intents.json"
 )
 
-CONFIDENCE_THRESHOLD = 0.5  # below this, don't trust the ML prediction
+CONFIDENCE_THRESHOLD = 0.5
 
-# Intents that MUST be handled by rules, never by ML, because getting
-# them wrong has outsized consequences (e.g. accidentally ending a chat).
 RULE_ONLY_INTENTS = {"goodbye"}
+PROGRAM_AWARE_INTENTS = {"tuition_fees", "admission_requirements", "enrollment_process"}
+LEVEL_AWARE_INTENTS = {"admission_requirements"}
 
 
 def load_intents(path: str = INTENTS_PATH) -> list:
@@ -38,11 +36,16 @@ def get_responses_by_tag(tag: str, intents: list) -> list:
     return ["Sorry, I didn't quite understand that. Could you rephrase your question?"]
 
 
+def get_level_response(tag: str, level: str, intents: list) -> str | None:
+    for intent in intents:
+        if intent["tag"] == tag:
+            level_responses = intent.get("level_responses", {})
+            if level in level_responses:
+                return "\n".join(level_responses[level])
+    return None
+
+
 def rule_based_match(user_input: str, intents: list) -> str | None:
-    """
-    Word-level rule matching (from Step 5). Returns a matching intent tag,
-    or None if nothing matches confidently.
-    """
     clean_text = normalize_text(user_input)
     input_words = set(clean_text.split())
 
@@ -53,11 +56,9 @@ def rule_based_match(user_input: str, intents: list) -> str | None:
                 continue
             if pattern_words.issubset(input_words):
                 return intent["tag"]
-
     return None
 
 
-# Load the ML model once, at import time (not per-request, for performance)
 try:
     _vectorizer, _model = load_model()
 except FileNotFoundError:
@@ -65,46 +66,67 @@ except FileNotFoundError:
 
 
 def find_intent_tag(user_input: str, intents: list) -> str:
-    """
-    Decides the final intent tag using the hybrid strategy:
-    1. Rule match on a RULE_ONLY_INTENTS -> always wins immediately.
-    2. Otherwise, try ML prediction. If confident enough, use it.
-    3. If ML isn't confident, fall back to rule matching.
-    4. If neither works, return 'fallback'.
-    """
     rule_tag = rule_based_match(user_input, intents)
 
-    # Step 1: critical intents always go through rules first
     if rule_tag in RULE_ONLY_INTENTS:
         return rule_tag
 
-    # Step 2: try ML
     if _model is not None:
         ml_tag, confidence = predict_intent(user_input, _vectorizer, _model)
         if confidence >= CONFIDENCE_THRESHOLD and ml_tag not in RULE_ONLY_INTENTS:
             return ml_tag
 
-    # Step 3: fall back to rules if ML wasn't confident
     if rule_tag is not None:
         return rule_tag
 
-    # Step 4: nothing worked
     return "fallback"
 
 
 def get_response(user_input: str, intents: list, state=None) -> str:
+    # --- Check if we're waiting on a clarification from a previous turn ---
+    if state:
+        awaiting = state.recall("awaiting_clarification")
+        if awaiting:
+            category = awaiting["entity_category"]
+            entities = extract_all_entities(user_input)
+
+            if category not in entities:
+                if "program" in entities:
+                    entities["admission_level"] = "College"
+                elif "shs_strand" in entities:
+                    entities["admission_level"] = "Senior High School"
+
+            if category in entities:
+                state.remember("awaiting_clarification", None)
+                level_reply = get_level_response(awaiting["tag"], entities[category], intents)
+                if level_reply:
+                    state.remember(category, entities[category])
+                    return level_reply
+
+            possible_tag = find_intent_tag(user_input, intents)
+            if possible_tag != "fallback":
+                state.remember("awaiting_clarification", None)  # they moved on
+            else:
+                return "I didn't catch that — are you asking about Senior High School or College?"
+
     tag = find_intent_tag(user_input, intents)
 
     if tag == "goodbye":
         return "__EXIT__"
 
+    if tag == "program_info":
+        programs = list_available_options("program")
+        strands = list_available_options("shs_strand")
+        return (
+            "Here are our available College programs:\n" + "\n".join(f"- {p}" for p in programs) +
+            "\n\nAnd our available Senior High School strands:\n" + "\n".join(f"- {s}" for s in strands)
+        )
+
     if tag == "fallback":
-        # Try the LLM layer first (returns None if not configured)
         llm_answer = ask_llm(user_input)
         if llm_answer:
             return llm_answer
 
-        # No LLM available (or it also couldn't help) - standard fallback
         if state:
             state.record_fallback()
             if state.fallback_count >= 3:
@@ -116,13 +138,31 @@ def get_response(user_input: str, intents: list, state=None) -> str:
     if state:
         state.reset_fallback()
 
+    entities = extract_all_entities(user_input)
+
+    if tag in LEVEL_AWARE_INTENTS and "admission_level" not in entities:
+        if "program" in entities:
+            entities["admission_level"] = "College"
+        elif "shs_strand" in entities:
+            entities["admission_level"] = "Senior High School"
+
+    if tag in LEVEL_AWARE_INTENTS and "admission_level" in entities:
+        level_reply = get_level_response(tag, entities["admission_level"], intents)
+        if level_reply:
+            if state:
+                state.remember("admission_level", entities["admission_level"])
+            return level_reply
+
     base_response = random.choice(get_responses_by_tag(tag, intents))
 
-    if tag in PROGRAM_AWARE_INTENTS:
-        program = extract_program(user_input)
-        if program:
-            if state:
-                state.remember("program", program)
-            base_response = f"[Regarding {program}] " + base_response
+    if tag in LEVEL_AWARE_INTENTS and "admission_level" not in entities:
+        if state:
+            state.remember("awaiting_clarification", {"tag": tag, "entity_category": "admission_level"})
+
+    if tag in PROGRAM_AWARE_INTENTS and "program" in entities:
+        program = entities["program"]
+        if state:
+            state.remember("program", program)
+        base_response = f"[Regarding {program}] " + base_response
 
     return base_response

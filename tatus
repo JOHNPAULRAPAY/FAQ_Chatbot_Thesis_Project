@@ -1,0 +1,1656 @@
+[1mdiff --git a/README.md b/README.md[m
+[1mindex e69de29..f6a4fb9 100644[m
+[1m--- a/README.md[m
+[1m+++ b/README.md[m
+[36m@@ -0,0 +1,210 @@[m
+[32m+[m[32m# Student Assistant Chatbot[m
+[32m+[m
+[32m+[m[32mA hybrid rule-based + machine learning chatbot that answers common questions from students and incoming enrollees — admissions, tuition, enrollment, and document requests — with support for program-specific and admission-level-specific answers.[m
+[32m+[m
+[32m+[m[32mBuilt as a thesis project, this chatbot is designed to be reliable without an internet-connected AI service, while remaining architecturally ready to plug in a real LLM later if needed.[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Features[m
+[32m+[m
+[32m+[m[32m- **Hybrid intent recognition** — combines deterministic rule matching with a trained ML classifier (TF-IDF + Logistic Regression), using confidence thresholds to decide which to trust[m
+[32m+[m[32m- **Entity extraction** — recognizes college programs (e.g. "BSCS" → Computer Science) and SHS strands (e.g. "STEM") using spaCy's `PhraseMatcher`[m
+[32m+[m[32m- **Context-aware conversations** — remembers what it's waiting to hear (e.g. "which level are you asking about?") across multiple messages, and auto-infers admission level from a mentioned program/strand[m
+[32m+[m[32m- **Safety-first design** — critical intents (like ending a conversation) are always handled by deterministic rules, never left to ML or an LLM[m
+[32m+[m[32m- **Optional LLM fallback layer** — stubbed and disabled by default; the system works fully without it, and it activates only when rules + ML both fail to understand a message[m
+[32m+[m[32m- **Persistent conversation history** — stored in SQLite via SQLAlchemy (users, conversations, messages, feedback)[m
+[32m+[m[32m- **REST API** — built with FastAPI, with CORS, rate limiting, input validation, and centralized error handling[m
+[32m+[m[32m- **Web chat interface** — plain HTML/CSS/JS frontend, no framework dependencies[m
+[32m+[m[32m- **Automated test suite** — 16 tests covering rule matching, ML classification, the API, and edge cases[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Architecture[m
+[32m+[m
+[32m+[m[32m```[m
+[32m+[m[32mUser (browser)[m
+[32m+[m[32m    │[m
+[32m+[m[32m    ▼[m
+[32m+[m[32mFrontend (docs/index.html)[m
+[32m+[m[32m    │  HTTP POST /chat[m
+[32m+[m[32m    ▼[m
+[32m+[m[32mFastAPI backend (app/api.py)[m
+[32m+[m[32m    │[m
+[32m+[m[32m    ├─→ ConversationState (per-session memory)[m
+[32m+[m[32m    │[m
+[32m+[m[32m    ├─→ Hybrid Engine (app/chatbot/engine.py)[m
+[32m+[m[32m    │       │[m
+[32m+[m[32m    │       ├─→ Rule matching (word-overlap on intents.json patterns)[m
+[32m+[m[32m    │       │     — always wins for RULE_ONLY_INTENTS (e.g. goodbye)[m
+[32m+[m[32m    │       │[m
+[32m+[m[32m    │       ├─→ ML Classifier (app/ml/classifier.py)[m
+[32m+[m[32m    │       │     — TF-IDF + Logistic Regression[m
+[32m+[m[32m    │       │     — used when confidence ≥ 0.5[m
+[32m+[m[32m    │       │[m
+[32m+[m[32m    │       ├─→ Entity Extraction (app/chatbot/entities.py)[m
+[32m+[m[32m    │       │     — spaCy PhraseMatcher: programs, SHS strands, admission level[m
+[32m+[m[32m    │       │[m
+[32m+[m[32m    │       └─→ LLM Layer (app/chatbot/llm_layer.py) — STUBBED[m
+[32m+[m[32m    │             — only activates if rules + ML both fail[m
+[32m+[m[32m    │             — disabled by default (no API key configured)[m
+[32m+[m[32m    │[m
+[32m+[m[32m    └─→ Database (app/database/models.py) — SQLite via SQLAlchemy[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m**Design principle:** every layer is replaceable without breaking the others. The CLI and the API both call the same `get_response()` function; rules and ML share `intents.json` as a single source of truth; the LLM layer is fully optional and the chatbot is provably functional without it.[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Project Structure[m
+[32m+[m
+[32m+[m[32m```[m
+[32m+[m[32mFAQ_Chatbot/[m
+[32m+[m[32m├── app/[m
+[32m+[m[32m│   ├── main.py                  # CLI entry point[m
+[32m+[m[32m│   ├── api.py                   # FastAPI entry point[m
+[32m+[m[32m│   ├── chatbot/[m
+[32m+[m[32m│   │   ├── engine.py            # hybrid rules+ML decision logic[m
+[32m+[m[32m│   │   ├── preprocessing.py     # normalization + lemmatization[m
+[32m+[m[32m│   │   ├── conversation.py      # per-session state[m
+[32m+[m[32m│   │   ├── entities.py          # program/strand/level extraction[m
+[32m+[m[32m│   │   └── llm_layer.py         # stubbed LLM fallback[m
+[32m+[m[32m│   ├── database/[m
+[32m+[m[32m│   │   └── models.py            # SQLAlchemy models[m
+[32m+[m[32m│   ├── ml/[m
+[32m+[m[32m│   │   ├── classifier.py        # training + prediction[m
+[32m+[m[32m│   │   └── model.pkl            # trained model (gitignored, regenerate via training)[m
+[32m+[m[32m│   └── data/[m
+[32m+[m[32m│       └── intents.json         # single source of truth: patterns + responses[m
+[32m+[m[32m├── docs/                        # frontend (named for GitHub Pages compatibility)[m
+[32m+[m[32m│   └── index.html[m
+[32m+[m[32m├── tests/[m
+[32m+[m[32m│   ├── test_rule_engine.py[m
+[32m+[m[32m│   ├── test_ml_classifier.py[m
+[32m+[m[32m│   ├── test_api.py[m
+[32m+[m[32m│   └── test_edge_cases.py[m
+[32m+[m[32m├── .env                         # local config (gitignored)[m
+[32m+[m[32m├── .gitignore[m
+[32m+[m[32m├── requirements.txt[m
+[32m+[m[32m└── README.md[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Setup[m
+[32m+[m
+[32m+[m[32m### Requirements[m
+[32m+[m[32m- Python 3.11 or 3.12 recommended (project has also been run on 3.14)[m
+[32m+[m
+[32m+[m[32m### 1. Clone and create a virtual environment[m
+[32m+[m
+[32m+[m[32m```powershell[m
+[32m+[m[32mgit clone <your-repo-url>[m
+[32m+[m[32mcd FAQ_Chatbot[m
+[32m+[m[32mpython -m venv venv[m
+[32m+[m[32mvenv\Scripts\Activate.ps1[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m> If PowerShell blocks the activation script, run this once:[m
+[32m+[m[32m> `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`[m
+[32m+[m
+[32m+[m[32m### 2. Install dependencies[m
+[32m+[m
+[32m+[m[32m```powershell[m
+[32m+[m[32mpython -m pip install -r requirements.txt[m
+[32m+[m[32mpython -m spacy download en_core_web_sm[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m### 3. Train the ML model[m
+[32m+[m
+[32m+[m[32m```powershell[m
+[32m+[m[32mpython -m app.ml.classifier[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m### 4. Configure environment variables[m
+[32m+[m
+[32m+[m[32mCreate a `.env` file in the project root:[m
+[32m+[m
+[32m+[m[32m```[m
+[32m+[m[32mDATABASE_URL=sqlite:///chatbot.db[m
+[32m+[m[32mALLOWED_ORIGINS=*[m
+[32m+[m[32mANTHROPIC_API_KEY=[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Running Locally[m
+[32m+[m
+[32m+[m[32m**CLI version:**[m
+[32m+[m[32m```powershell[m
+[32m+[m[32mpython -m app.main[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m**API + Web UI:**[m
+[32m+[m[32m```powershell[m
+[32m+[m[32mpython -m uvicorn app.api:app --reload[m
+[32m+[m[32m```[m
+[32m+[m[32mThen open `docs/index.html` in a browser. Interactive API docs are available at `http://127.0.0.1:8000/docs`.[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Testing[m
+[32m+[m
+[32m+[m[32m```powershell[m
+[32m+[m[32mpython -m pytest tests/ -v[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32mCovers: rule-based matching, text normalization/lemmatization, ML classifier sanity checks, API request/response validation, conversation persistence, fallback/escalation behavior, and critical-intent safety (e.g. "goodbye" always exits regardless of ML confidence).[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Maintenance[m
+[32m+[m
+[32m+[m[32m### Adding a new intent[m
+[32m+[m
+[32m+[m[32m1. Add an entry to `app/data/intents.json` with a `tag`, several example `patterns`, and `responses`[m
+[32m+[m[32m2. Retrain the model: `python -m app.ml.classifier`[m
+[32m+[m[32m3. If the intent is safety-critical, add its tag to `RULE_ONLY_INTENTS` in `app/chatbot/engine.py`[m
+[32m+[m[32m4. Test via CLI or `/docs` before deploying[m
+[32m+[m
+[32m+[m[32m### Adding a new entity category (e.g. campus, semester)[m
+[32m+[m
+[32m+[m[32mAdd a new key to `ENTITY_DEFINITIONS` in `app/chatbot/entities.py`, following the existing `{canonical_name: [aliases]}` shape — no other code changes needed to detect it.[m
+[32m+[m
+[32m+[m[32m### Retraining the ML model[m
+[32m+[m
+[32m+[m[32mRequired whenever `intents.json` patterns change (not required for response-text-only changes):[m
+[32m+[m[32m```powershell[m
+[32m+[m[32mpython -m app.ml.classifier[m
+[32m+[m[32m```[m
+[32m+[m[32mThis regenerates `app/ml/model.pkl`, which is gitignored and rebuilt automatically during deployment.[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Deployment[m
+[32m+[m
+[32m+[m[32m- **Backend**: deployed on [Render](https://render.com) (free tier)[m
+[32m+[m[32m  - Build command: `pip install -r requirements.txt && python -m spacy download en_core_web_sm && python -m app.ml.classifier`[m
+[32m+[m[32m  - Start command: `uvicorn app.api:app --host 0.0.0.0 --port $PORT`[m
+[32m+[m[32m- **Frontend**: deployed on GitHub Pages, served from the `docs/` folder[m
+[32m+[m[32m- `ALLOWED_ORIGINS` is set on the backend to the exact frontend origin (no wildcard) in production[m
+[32m+[m
+[32m+[m[32m**Known limitation:** SQLite on Render's free tier is not guaranteed to persist across redeploys, since the filesystem is ephemeral. Acceptable for a thesis demo; a hosted Postgres database is a natural upgrade path.[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Future Improvements[m
+[32m+[m
+[32m+[m[32m- Store per-program tuition/requirement data for fully customized answers (beyond the current `[Regarding X]` tagging)[m
+[32m+[m[32m- Use remembered context (`ConversationState`) so follow-up questions don't require repeating the program/level[m
+[32m+[m[32m- Add fuzzy spelling correction for typos (e.g. "henlo") that lemmatization alone doesn't fix[m
+[32m+[m[32m- Activate the real LLM layer if budget/approval allows[m
+[32m+[m[32m- Migrate to a persistent hosted database for production[m
+[32m+[m[32m- Wire the existing `feedback` database table to UI buttons (thumbs up/down) to collect real response-quality data[m
+[32m+[m[32m- Build a simple admin view of common fallback questions to guide which new intents to add next[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Tech Stack[m
+[32m+[m
+[32m+[m[32mPython · FastAPI · SQLAlchemy · SQLite · scikit-learn · spaCy · pytest · HTML/CSS/JavaScript[m
+\ No newline at end of file[m
+[1mdiff --git a/app/chatbot/engine.py b/app/chatbot/engine.py[m
+[1mindex 675adfa..79bf666 100644[m
+[1m--- a/app/chatbot/engine.py[m
+[1m+++ b/app/chatbot/engine.py[m
+[36m@@ -8,21 +8,19 @@[m [mimport os[m
+ import random[m
+ [m
+ from app.chatbot.llm_layer import ask_llm[m
+[31m-from app.chatbot.entities import extract_program[m
+[32m+[m[32mfrom app.chatbot.entities import extract_all_entities, list_available_options[m
+ from app.chatbot.preprocessing import normalize_text[m
+ from app.ml.classifier import load_model, predict_intent[m
+ [m
+[31m-PROGRAM_AWARE_INTENTS = {"tuition_fees", "admission_requirements", "enrollment_process"}[m
+[31m-[m
+ INTENTS_PATH = os.path.join([m
+     os.path.dirname(__file__), "..", "data", "intents.json"[m
+ )[m
+ [m
+[31m-CONFIDENCE_THRESHOLD = 0.5  # below this, don't trust the ML prediction[m
+[32m+[m[32mCONFIDENCE_THRESHOLD = 0.5[m
+ [m
+[31m-# Intents that MUST be handled by rules, never by ML, because getting[m
+[31m-# them wrong has outsized consequences (e.g. accidentally ending a chat).[m
+ RULE_ONLY_INTENTS = {"goodbye"}[m
+[32m+[m[32mPROGRAM_AWARE_INTENTS = {"tuition_fees", "admission_requirements", "enrollment_process"}[m
+[32m+[m[32mLEVEL_AWARE_INTENTS = {"admission_requirements"}[m
+ [m
+ [m
+ def load_intents(path: str = INTENTS_PATH) -> list:[m
+[36m@@ -38,11 +36,16 @@[m [mdef get_responses_by_tag(tag: str, intents: list) -> list:[m
+     return ["Sorry, I didn't quite understand that. Could you rephrase your question?"][m
+ [m
+ [m
+[32m+[m[32mdef get_level_response(tag: str, level: str, intents: list) -> str | None:[m
+[32m+[m[32m    for intent in intents:[m
+[32m+[m[32m        if intent["tag"] == tag:[m
+[32m+[m[32m            level_responses = intent.get("level_responses", {})[m
+[32m+[m[32m            if level in level_responses:[m
+[32m+[m[32m                return "\n".join(level_responses[level])[m
+[32m+[m[32m    return None[m
+[32m+[m
+[32m+[m
+ def rule_based_match(user_input: str, intents: list) -> str | None:[m
+[31m-    """[m
+[31m-    Word-level rule matching (from Step 5). Returns a matching intent tag,[m
+[31m-    or None if nothing matches confidently.[m
+[31m-    """[m
+     clean_text = normalize_text(user_input)[m
+     input_words = set(clean_text.split())[m
+ [m
+[36m@@ -53,11 +56,9 @@[m [mdef rule_based_match(user_input: str, intents: list) -> str | None:[m
+                 continue[m
+             if pattern_words.issubset(input_words):[m
+                 return intent["tag"][m
+[31m-[m
+     return None[m
+ [m
+ [m
+[31m-# Load the ML model once, at import time (not per-request, for performance)[m
+ try:[m
+     _vectorizer, _model = load_model()[m
+ except FileNotFoundError:[m
+[36m@@ -65,46 +66,67 @@[m [mexcept FileNotFoundError:[m
+ [m
+ [m
+ def find_intent_tag(user_input: str, intents: list) -> str:[m
+[31m-    """[m
+[31m-    Decides the final intent tag using the hybrid strategy:[m
+[31m-    1. Rule match on a RULE_ONLY_INTENTS -> always wins immediately.[m
+[31m-    2. Otherwise, try ML prediction. If confident enough, use it.[m
+[31m-    3. If ML isn't confident, fall back to rule matching.[m
+[31m-    4. If neither works, return 'fallback'.[m
+[31m-    """[m
+     rule_tag = rule_based_match(user_input, intents)[m
+ [m
+[31m-    # Step 1: critical intents always go through rules first[m
+     if rule_tag in RULE_ONLY_INTENTS:[m
+         return rule_tag[m
+ [m
+[31m-    # Step 2: try ML[m
+     if _model is not None:[m
+         ml_tag, confidence = predict_intent(user_input, _vectorizer, _model)[m
+         if confidence >= CONFIDENCE_THRESHOLD and ml_tag not in RULE_ONLY_INTENTS:[m
+             return ml_tag[m
+ [m
+[31m-    # Step 3: fall back to rules if ML wasn't confident[m
+     if rule_tag is not None:[m
+         return rule_tag[m
+ [m
+[31m-    # Step 4: nothing worked[m
+     return "fallback"[m
+ [m
+ [m
+ def get_response(user_input: str, intents: list, state=None) -> str:[m
+[32m+[m[32m    # --- Check if we're waiting on a clarification from a previous turn ---[m
+[32m+[m[32m    if state:[m
+[32m+[m[32m        awaiting = state.recall("awaiting_clarification")[m
+[32m+[m[32m        if awaiting:[m
+[32m+[m[32m            category = awaiting["entity_category"][m
+[32m+[m[32m            entities = extract_all_entities(user_input)[m
+[32m+[m
+[32m+[m[32m            if category not in entities:[m
+[32m+[m[32m                if "program" in entities:[m
+[32m+[m[32m                    entities["admission_level"] = "College"[m
+[32m+[m[32m                elif "shs_strand" in entities:[m
+[32m+[m[32m                    entities["admission_level"] = "Senior High School"[m
+[32m+[m
+[32m+[m[32m            if category in entities:[m
+[32m+[m[32m                state.remember("awaiting_clarification", None)[m
+[32m+[m[32m                level_reply = get_level_response(awaiting["tag"], entities[category], intents)[m
+[32m+[m[32m                if level_reply:[m
+[32m+[m[32m                    state.remember(category, entities[category])[m
+[32m+[m[32m                    return level_reply[m
+[32m+[m
+[32m+[m[32m            possible_tag = find_intent_tag(user_input, intents)[m
+[32m+[m[32m            if possible_tag != "fallback":[m
+[32m+[m[32m                state.remember("awaiting_clarification", None)  # they moved on[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                return "I didn't catch that — are you asking about Senior High School or College?"[m
+[32m+[m
+     tag = find_intent_tag(user_input, intents)[m
+ [m
+     if tag == "goodbye":[m
+         return "__EXIT__"[m
+ [m
+[32m+[m[32m    if tag == "program_info":[m
+[32m+[m[32m        programs = list_available_options("program")[m
+[32m+[m[32m        strands = list_available_options("shs_strand")[m
+[32m+[m[32m        return ([m
+[32m+[m[32m            "Here are our available College programs:\n" + "\n".join(f"- {p}" for p in programs) +[m
+[32m+[m[32m            "\n\nAnd our available Senior High School strands:\n" + "\n".join(f"- {s}" for s in strands)[m
+[32m+[m[32m        )[m
+[32m+[m
+     if tag == "fallback":[m
+[31m-        # Try the LLM layer first (returns None if not configured)[m
+         llm_answer = ask_llm(user_input)[m
+         if llm_answer:[m
+             return llm_answer[m
+ [m
+[31m-        # No LLM available (or it also couldn't help) - standard fallback[m
+         if state:[m
+             state.record_fallback()[m
+             if state.fallback_count >= 3:[m
+[36m@@ -116,13 +138,31 @@[m [mdef get_response(user_input: str, intents: list, state=None) -> str:[m
+     if state:[m
+         state.reset_fallback()[m
+ [m
+[31m-    base_response = random.choice(get_responses_by_tag(tag, intents))[m
+[32m+[m[32m    entities = extract_all_entities(user_input)[m
+ [m
+[31m-    if tag in PROGRAM_AWARE_INTENTS:[m
+[31m-        program = extract_program(user_input)[m
+[31m-        if program:[m
+[32m+[m[32m    if tag in LEVEL_AWARE_INTENTS and "admission_level" not in entities:[m
+[32m+[m[32m        if "program" in entities:[m
+[32m+[m[32m            entities["admission_level"] = "College"[m
+[32m+[m[32m        elif "shs_strand" in entities:[m
+[32m+[m[32m            entities["admission_level"] = "Senior High School"[m
+[32m+[m
+[32m+[m[32m    if tag in LEVEL_AWARE_INTENTS and "admission_level" in entities:[m
+[32m+[m[32m        level_reply = get_level_response(tag, entities["admission_level"], intents)[m
+[32m+[m[32m        if level_reply:[m
+             if state:[m
+[31m-                state.remember("program", program)[m
+[31m-            base_response = f"[Regarding {program}] " + base_response[m
+[32m+[m[32m                state.remember("admission_level", entities["admission_level"])[m
+[32m+[m[32m            return level_reply[m
+[32m+[m
+[32m+[m[32m    base_response = random.choice(get_responses_by_tag(tag, intents))[m
+[32m+[m
+[32m+[m[32m    if tag in LEVEL_AWARE_INTENTS and "admission_level" not in entities:[m
+[32m+[m[32m        if state:[m
+[32m+[m[32m            state.remember("awaiting_clarification", {"tag": tag, "entity_category": "admission_level"})[m
+[32m+[m
+[32m+[m[32m    if tag in PROGRAM_AWARE_INTENTS and "program" in entities:[m
+[32m+[m[32m        program = entities["program"][m
+[32m+[m[32m        if state:[m
+[32m+[m[32m            state.remember("program", program)[m
+[32m+[m[32m        base_response = f"[Regarding {program}] " + base_response[m
+ [m
+     return base_response[m
+\ No newline at end of file[m
+[1mdiff --git a/app/chatbot/entities.py b/app/chatbot/entities.py[m
+[1mindex dd9a136..fbd2e2a 100644[m
+[1m--- a/app/chatbot/entities.py[m
+[1m+++ b/app/chatbot/entities.py[m
+[36m@@ -1,41 +1,87 @@[m
+ """[m
+[31m-Entity extraction: detects known entities (currently: academic program[m
+[31m-names) mentioned in user messages, using spaCy's PhraseMatcher with a[m
+[31m-custom list of terms specific to this school.[m
+[32m+[m[32mEntity extraction: detects known entities mentioned in user messages,[m
+[32m+[m[32musing spaCy's PhraseMatcher with custom term lists per category.[m
+[32m+[m
+[32m+[m[32mTo add a NEW entity category later (e.g. campus, year level, semester):[m
+[32m+[m[32mjust add a new key to ENTITY_DEFINITIONS below, following the same[m
+[32m+[m[32m{canonical_name: [aliases]} shape.[m
+ """[m
+ import spacy[m
+ from spacy.matcher import PhraseMatcher[m
+ [m
+ _nlp = spacy.load("en_core_web_sm")[m
+ [m
+[31m-# EDIT THIS LIST with your school's actual program names and common[m
+[31m-# abbreviations/aliases students might type for each.[m
+[31m-PROGRAMS = {[m
+[31m-    "Accounting Information Technology": ["accounting information technology", "ait", "bsait"],[m
+[31m-    "Computer Science": ["comsci", "computer science", "cs"],[m
+[31m-    "Entrepreneurship": ["entrepreneurship", "entrep", "entrepreneur"],[m
+[31m-    "Associate in Computer Technology": ["associate in computer technology", "associate computer technology", "act"],[m
+[32m+[m[32mENTITY_DEFINITIONS = {[m
+[32m+[m[32m    "program": {[m
+[32m+[m[32m        "Accounting Information Technology": ["accounting information technology", "ait", "bsait"],[m
+[32m+[m[32m        "Computer Science": ["comsci", "computer science", "cs", "bscs"],[m
+[32m+[m[32m        "Entrepreneurship": ["entrepreneurship", "entrep", "entrepreneur", "bse"],[m
+[32m+[m[32m        "Associate in Computer Technology": ["associate in computer technology", "associate computer technology", "act"],[m
+[32m+[m[32m    },[m
+[32m+[m[32m    "shs_strand": {[m
+[32m+[m[32m        "STEM": ["stem", "science technolgy engineering and mathematics"],[m
+[32m+[m[32m        "ABM": ["abm", "accountancy business and management"],[m
+[32m+[m[32m        "HUMSS": ["humss", "humanities and social science"],[m
+[32m+[m[32m        "GAS": ["gas", "general academic strand"],[m
+[32m+[m[32m        "ICT": ["ict", "information and communication technolgy"][m
+[32m+[m[32m    },[m
+[32m+[m[32m    "admission_level": {[m
+[32m+[m[32m        "Senior High School": ["shs", "senior high school", "senior high", "grade 11", "grade 12"],[m
+[32m+[m[32m        "College": ["college", "tertiary", "undergraduate", "bachelors degree", "bachelor"],[m
+[32m+[m[32m    },[m
+ }[m
+ [m
+[31m-_matcher = PhraseMatcher(_nlp.vocab, attr="LOWER")[m
+[32m+[m[32m# One PhraseMatcher per category, so categories never collide with each other[m
+[32m+[m[32m_matchers = {}[m
+ [m
+[31m-for program_name, aliases in PROGRAMS.items():[m
+[31m-    patterns = [_nlp.make_doc(alias) for alias in aliases][m
+[31m-    _matcher.add(program_name, patterns)[m
+[32m+[m[32mfor category, entities in ENTITY_DEFINITIONS.items():[m
+[32m+[m[32m    matcher = PhraseMatcher(_nlp.vocab, attr="LOWER")[m
+[32m+[m[32m    for canonical_name, aliases in entities.items():[m
+[32m+[m[32m        patterns = [_nlp.make_doc(alias) for alias in aliases][m
+[32m+[m[32m        matcher.add(canonical_name, patterns)[m
+[32m+[m[32m    _matchers[category] = matcher[m
+ [m
+ [m
+[31m-def extract_program(text: str) -> str | None:[m
+[32m+[m[32mdef extract_entity(text: str, category: str) -> str | None:[m
+     """[m
+[31m-    Scans text for a known program name/alias. Returns the canonical[m
+[31m-    program name if found (e.g. "bsit" -> "Information Technology"),[m
+[31m-    or None if no program is mentioned.[m
+[32m+[m[32m    Scans text for a known entity within one category (e.g. 'program').[m
+[32m+[m[32m    Returns the canonical name if found, or None.[m
+     """[m
+[32m+[m[32m    if category not in _matchers:[m
+[32m+[m[32m        return None[m
+[32m+[m
+     doc = _nlp(text.lower())[m
+[31m-    matches = _matcher(doc)[m
+[32m+[m[32m    matches = _matchers[category](doc)[m
+ [m
+     if not matches:[m
+         return None[m
+ [m
+[31m-    match_id, start, end = matches[0]  # take the first match found[m
+[31m-    canonical_name = _nlp.vocab.strings[match_id][m
+[31m-    return canonical_name[m
+\ No newline at end of file[m
+[32m+[m[32m    match_id, start, end = matches[0][m
+[32m+[m[32m    return _nlp.vocab.strings[match_id][m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef extract_all_entities(text: str) -> dict:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Runs extraction across ALL categories at once.[m
+[32m+[m[32m    Returns e.g. {"program": "Computer Science", "admission_level": "College"}[m
+[32m+[m[32m    (keys with no match are omitted).[m
+[32m+[m[32m    """[m
+[32m+[m[32m    doc_lower = text.lower()[m
+[32m+[m[32m    doc = _nlp(doc_lower)[m
+[32m+[m
+[32m+[m[32m    found = {}[m
+[32m+[m[32m    for category, matcher in _matchers.items():[m
+[32m+[m[32m        matches = matcher(doc)[m
+[32m+[m[32m        if matches:[m
+[32m+[m[32m            match_id, start, end = matches[0][m
+[32m+[m[32m            found[category] = _nlp.vocab.strings[match_id][m
+[32m+[m
+[32m+[m[32m    return found[m
+[32m+[m
+[32m+[m[32mdef list_available_options(category: str) -> list:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Returns the canonical names of all known entities in a category[m
+[32m+[m[32m    (e.g. all college programs, or all SHS strands). Used to tell users[m
+[32m+[m[32m    what's available when they ask, or when their input isn't recognized.[m
+[32m+[m[32m    """[m
+[32m+[m[32m    return list(ENTITY_DEFINITIONS.get(category, {}).keys())[m
+\ No newline at end of file[m
+[1mdiff --git a/app/data/intents.json b/app/data/intents.json[m
+[1mindex b46b893..dd7204a 100644[m
+[1m--- a/app/data/intents.json[m
+[1m+++ b/app/data/intents.json[m
+[36m@@ -2,7 +2,7 @@[m
+     "intents": [[m
+         {[m
+             "tag": "greeting",[m
+[31m-            "patterns": ["hi", "hello", "hey", "good morning", "good afternoon", "hiya", "is anyone there", "hello there", "greetings"],[m
+[32m+[m[32m            "patterns": ["hi", "hello", "hey", "good morning", "good afternoon", "hiya", "is anyone there", "hello there", "greetings", "henlo"],[m
+             "responses": ["Hello! I'm your student assistant. Ask me about admissions, tuition, or enrollment."][m
+         },[m
+         {[m
+[36m@@ -10,10 +10,33 @@[m
+             "patterns": ["bye", "exit", "quit", "goodbye", "thanks that's all", "end", "see you", "i have to go", "talk to you later"],[m
+             "responses": ["Goodbye! Good luck with your studies."][m
+         },[m
+[31m-        {[m
+[32m+[m[32m        {[m[41m         [m
+             "tag": "admission_requirements",[m
+             "patterns": ["requirements", "documents", "what do i need to enroll", "requirements for freshmen", "what papers do i need", "admission requirements", "what should i prepare to apply", "documents needed for admission"],[m
+[31m-            "responses": ["For admission, you'll typically need: Form 138, birth certificate, and a valid ID. Requirements may vary by program."][m
+[32m+[m[32m            "responses": ["Admission requirements differ between Senior High School and College. Could you tell me which one you're asking about?"],[m
+[32m+[m[32m            "level_responses": {[m
+[32m+[m[32m                "Senior High School": [[m
+[32m+[m[32m                    "Requirements for Enrollment in Senior High School",[m
+[32m+[m[32m                    "JUNIOR HIGH SCHOOL / GRADE 10 COMPLETER / TRANSFEREE, you'll typically need:",[m
+[32m+[m[32m                    "1. Uncancelled Report Card (Form 138)",[m
+[32m+[m[32m                    "2. Secondary Student's Permanent Record (Form 137)",[m
+[32m+[m[32m                    "3. Certificate of Good Moral Character",[m
+[32m+[m[32m                    "4. Photocopy of Certificate of Completion / JHS Diploma",[m
+[32m+[m[32m                    "5. ESC  Certificate (From Private School Only)",[m
+[32m+[m[32m                    "6. Original Copy of PSA Birth Certificate",[m
+[32m+[m[32m                    "7. 1pcs. 2x2 & 4 pcs. 1x1 colored ID Picture (White Background)"[m
+[32m+[m[32m                ],[m
+[32m+[m[32m                "College": [[m
+[32m+[m[32m                    "Requirements for Enrollment in College",[m
+[32m+[m[32m                    "SENIOR HIGH SCHOOL COMPLETER / TRANSFEREE, you'll typically need:",[m
+[32m+[m[32m                    "1. Uncancelled Report Card (SF-9)",[m
+[32m+[m[32m                    "2. Senior High School Permanent Record (SF-10)",[m
+[32m+[m[32m                    "3. Certificate of Good Moral Character",[m
+[32m+[m[32m                    "4. Photocopy of Certificate of Completion / SHS Diploma",[m
+[32m+[m[32m                    "5. Original Copy of PSA Birth Certificate",[m
+[32m+[m[32m                    "6. 1pcs. 2x2 & 4 pcs. 1x1 colored ID Picture (White Background)"[m
+[32m+[m[32m                ][m
+[32m+[m[32m        }[m
+         },[m
+         {[m
+             "tag": "tuition_fees",[m
+[36m@@ -23,8 +46,25 @@[m
+         {[m
+             "tag": "enrollment_process",[m
+             "patterns": ["enroll", "register", "how do i enroll", "steps to register", "how to sign up", "enrollment process", "where do i enroll", "online enrollment"],[m
+[31m-            "responses": ["To enroll, visit the Admissions Office with your requirements, or use the online enrollment portal."][m
+[32m+[m[32m            "responses": ["To enroll, visit the Admissions Office with your requirements."][m
+[32m+[m[32m        },[m
+[32m+[m[32m        {[m
+[32m+[m[32m            "tag": "document_request",[m
+[32m+[m[32m            "patterns": ["document request", "credential request", "how to get requirement", "how to request", "how to get my documents", "how to get my credentials"],[m
+[32m+[m[32m            "responses": [[m
+[32m+[m[32m                "To request your documents, either email the ACLC Iriga campus or visit the school directly.\n\nHere are the costs for requesting your credentials:\nCertificate of Grades        500.00\nGood Moral                   50.00\nCertificate of Enrollment    50.00\nF137                         200.00\nF138                         200.00\nHonorable Dismissal          500.00\nTOR                          200.00\nDiploma (SHS)                500.00\nDiploma (College)            600.00"[m
+[32m+[m[32m            ][m
+[32m+[m[32m        },[m
+[32m+[m[32m        {[m
+[32m+[m[32m            "tag": "program_info",[m
+[32m+[m[32m            "patterns": ["what courses do you offer", "available courses", "list of programs", "what programs are available", "what can i take", "what courses are offered", "what strands do you have"],[m
+[32m+[m[32m            "responses": ["placeholder - generated dynamically, see engine.py"][m
+         },[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m
+         {[m
+             "tag": "fallback",[m
+             "patterns": [],[m
+[1mdiff --git a/docs/index.html b/docs/index.html[m
+[1mindex 99e05b3..4c8fec1 100644[m
+[1m--- a/docs/index.html[m
+[1m+++ b/docs/index.html[m
+[36m@@ -2,120 +2,971 @@[m
+ <html lang="en">[m
+ <head>[m
+     <meta charset="UTF-8">[m
+[31m-    <title>Student Assistant Chatbot</title>[m
+[32m+[m[32m    <meta name="viewport" content="width=device-width, initial-scale=1.0">[m
+[32m+[m[32m    <title>ACLC Online | Home</title>[m
+[32m+[m[32m    <link rel="icon" href="../images/unnamed.png">[m
+[32m+[m
+[32m+[m[32m    <link rel="preconnect" href="https://fonts.googleapis.com">[m
+[32m+[m[32m    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>[m
+[32m+[m[32m    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">[m
+[32m+[m
+     <style>[m
+[32m+[m[32m        /* ---------- Design tokens ---------- */[m
+[32m+[m[32m        :root {[m
+[32m+[m[32m            --bg: #F6F7FB;[m
+[32m+[m[32m            --surface: #FFFFFF;[m
+[32m+[m[32m            --ink: #14171F;[m
+[32m+[m[32m            --ink-soft: #545B70;[m
+[32m+[m[32m            --indigo: #24337A;[m
+[32m+[m[32m            --indigo-deep: #161F52;[m
+[32m+[m[32m            --amber: #F0A63B;[m
+[32m+[m[32m            --amber-deep: #C97F17;[m
+[32m+[m[32m            --line: #E3E6F0;[m
+[32m+[m
+[32m+[m[32m            --font-display: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;[m
+[32m+[m[32m            --font-body: 'Inter', 'Segoe UI', Arial, sans-serif;[m
+[32m+[m
+[32m+[m[32m            --max-width: 1180px;[m
+[32m+[m[32m            --radius-lg: 20px;[m
+[32m+[m[32m            --radius-sm: 10px;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        * { box-sizing: border-box; min-width: 0; }[m
+[32m+[m
+[32m+[m[32m        html, body { overflow-x: hidden; max-width: 100%; }[m
+[32m+[m
+[32m+[m[32m        html { scroll-behavior: smooth; }[m
+[32m+[m
+         body {[m
+[31m-            font-family: Arial, sans-serif;[m
+[31m-            max-width: 500px;[m
+[31m-            margin: 40px auto;[m
+[31m-            background: #f4f4f4;[m
+[32m+[m[32m            margin: 0;[m
+[32m+[m[32m            font-family: var(--font-body);[m
+[32m+[m[32m            background: var(--bg);[m
+[32m+[m[32m            color: var(--ink);[m
+[32m+[m[32m            -webkit-font-smoothing: antialiased;[m
+         }[m
+[31m-        #chat-window {[m
+[31m-            background: white;[m
+[31m-            border-radius: 8px;[m
+[31m-            height: 400px;[m
+[31m-            overflow-y: auto;[m
+[31m-            padding: 15px;[m
+[31m-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);[m
+[31m-        }[m
+[31m-        .message {[m
+[31m-            margin: 8px 0;[m
+[31m-            padding: 8px 12px;[m
+[31m-            border-radius: 12px;[m
+[31m-            max-width: 75%;[m
+[31m-            clear: both;[m
+[31m-        }[m
+[31m-        .user-message {[m
+[31m-            background: #007bff;[m
+[31m-            color: white;[m
+[31m-            float: right;[m
+[31m-        }[m
+[31m-        .bot-message {[m
+[31m-            background: #e5e5ea;[m
+[31m-            color: black;[m
+[31m-            float: left;[m
+[31m-        }[m
+[31m-        #input-area {[m
+[32m+[m
+[32m+[m[32m        img { max-width: 100%; display: block; }[m
+[32m+[m[32m        a { color: inherit; }[m
+[32m+[m[32m        h1, h2, h3 { font-family: var(--font-display); margin: 0; }[m
+[32m+[m[32m        button { font-family: inherit; }[m
+[32m+[m
+[32m+[m[32m        .section-inner { max-width: var(--max-width); margin: 0 auto; }[m
+[32m+[m[32m        .section-inner.narrow { max-width: 760px; }[m
+[32m+[m
+[32m+[m[32m        :focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }[m
+[32m+[m
+[32m+[m[32m        .skip-link {[m
+[32m+[m[32m            position: absolute;[m
+[32m+[m[32m            left: 16px;[m
+[32m+[m[32m            top: -60px;[m
+[32m+[m[32m            background: var(--indigo-deep);[m
+[32m+[m[32m            color: #fff;[m
+[32m+[m[32m            padding: 10px 18px;[m
+[32m+[m[32m            border-radius: var(--radius-sm);[m
+[32m+[m[32m            z-index: 3000;[m
+[32m+[m[32m            text-decoration: none;[m
+[32m+[m[32m            font-weight: 600;[m
+[32m+[m[32m            transition: top 0.2s ease;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .skip-link:focus { top: 16px; }[m
+[32m+[m
+[32m+[m[32m        @media (prefers-reduced-motion: reduce) {[m
+[32m+[m[32m            html { scroll-behavior: auto; }[m
+[32m+[m[32m            * { transition: none !important; animation: none !important; }[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Scroll progress ---------- */[m
+[32m+[m[32m        .scroll-progress {[m
+[32m+[m[32m            position: fixed;[m
+[32m+[m[32m            top: 0; left: 0;[m
+[32m+[m[32m            height: 3px;[m
+[32m+[m[32m            width: 0%;[m
+[32m+[m[32m            background: var(--amber);[m
+[32m+[m[32m            z-index: 2100;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Navbar ---------- */[m
+[32m+[m[32m        .navbar {[m
+[32m+[m[32m            position: sticky;[m
+[32m+[m[32m            top: 0;[m
+[32m+[m[32m            z-index: 2000;[m
+[32m+[m[32m            background: linear-gradient(180deg, rgba(12,14,26,0.55), rgba(12,14,26,0));[m
+[32m+[m[32m            backdrop-filter: blur(6px);[m
+[32m+[m[32m            transition: background 0.3s ease, box-shadow 0.3s ease;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .navbar.scrolled {[m
+[32m+[m[32m            background: var(--indigo-deep);[m
+[32m+[m[32m            backdrop-filter: none;[m
+[32m+[m[32m            box-shadow: 0 4px 18px rgba(0,0,0,0.12);[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .navbar-inner {[m
+[32m+[m[32m            position: relative;[m
+             display: flex;[m
+[31m-            margin-top: 10px;[m
+[32m+[m[32m            justify-content: space-between;[m
+[32m+[m[32m            align-items: center;[m
+[32m+[m[32m            gap: 16px;[m
+[32m+[m[32m            padding: 16px 40px;[m
+[32m+[m[32m            max-width: var(--max-width);[m
+[32m+[m[32m            margin: 0 auto;[m
+         }[m
+[31m-        #user-input {[m
+[31m-            flex: 1;[m
+[31m-            padding: 10px;[m
+[31m-            border-radius: 6px;[m
+[31m-            border: 1px solid #ccc;[m
+[32m+[m
+[32m+[m[32m        .brand {[m
+[32m+[m[32m            font-size: 1.3rem;[m
+[32m+[m[32m            font-weight: 700;[m
+[32m+[m[32m            color: #fff;[m
+[32m+[m[32m            text-decoration: none;[m
+[32m+[m[32m            letter-spacing: 0.01em;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .nav-links { display: flex; align-items: center; gap: 30px; }[m
+[32m+[m[32m        .nav-links a {[m
+[32m+[m[32m            color: #fff;[m
+[32m+[m[32m            text-decoration: none;[m
+[32m+[m[32m            font-weight: 500;[m
+[32m+[m[32m            font-size: 0.95rem;[m
+[32m+[m[32m            opacity: 0.92;[m
+         }[m
+[31m-        #send-button {[m
+[32m+[m[32m        .nav-links a:hover { opacity: 1; }[m
+[32m+[m
+[32m+[m[32m        .nav-cta {[m
+[32m+[m[32m            display: inline-flex;[m
+[32m+[m[32m            align-items: center;[m
+[32m+[m[32m            gap: 8px;[m
+[32m+[m[32m            background: var(--amber) !important;[m
+[32m+[m[32m            color: var(--indigo-deep) !important;[m
+             padding: 10px 20px;[m
+[31m-            margin-left: 8px;[m
+[32m+[m[32m            border-radius: 999px;[m
+[32m+[m[32m            font-weight: 600 !important;[m
+[32m+[m[32m            opacity: 1 !important;[m
+[32m+[m[32m            transition: background 0.2s ease, transform 0.2s ease;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .nav-cta:hover { background: #ffc266 !important; transform: translateY(-1px); }[m
+[32m+[m[32m        .nav-cta svg { width: 16px; height: 16px; }[m
+[32m+[m
+[32m+[m[32m        .nav-toggle {[m
+[32m+[m[32m            display: none;[m
+[32m+[m[32m            background: none;[m
+             border: none;[m
+[31m-            background: #007bff;[m
+[31m-            color: white;[m
+[31m-            border-radius: 6px;[m
+[32m+[m[32m            color: #fff;[m
+             cursor: pointer;[m
+[32m+[m[32m            padding: 6px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .nav-toggle svg { width: 26px; height: 26px; }[m
+[32m+[m[32m        .nav-toggle.is-open { background: rgba(255,255,255,0.14); border-radius: 8px; }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Hero ---------- */[m
+[32m+[m[32m        .hero {[m
+[32m+[m[32m            position: relative;[m
+[32m+[m[32m            min-height: 100vh;[m
+[32m+[m[32m            min-height: 100svh;[m
+[32m+[m[32m            display: flex;[m
+[32m+[m[32m            align-items: flex-end;[m
+[32m+[m[32m            overflow: hidden;[m
+[32m+[m[32m            color: #fff;[m
+[32m+[m[32m            margin-top: -76px; /* sits behind sticky navbar */[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .hero-media { position: absolute; inset: 0; z-index: 0; overflow: hidden; }[m
+[32m+[m
+[32m+[m[32m        .hero-fallback {[m
+[32m+[m[32m            position: absolute; inset: 0; z-index: 0;[m
+[32m+[m[32m            background:[m
+[32m+[m[32m                radial-gradient(circle at 18% 22%, rgba(255,255,255,0.09), transparent 42%),[m
+[32m+[m[32m                radial-gradient(circle at 82% 64%, rgba(255,255,255,0.09), transparent 46%),[m
+[32m+[m[32m                linear-gradient(135deg, var(--indigo), var(--indigo-deep));[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .hero-fallback .note {[m
+[32m+[m[32m            position: absolute;[m
+[32m+[m[32m            right: 20px;[m
+[32m+[m[32m            bottom: 20px;[m
+[32m+[m[32m            background: rgba(255,255,255,0.14);[m
+[32m+[m[32m            backdrop-filter: blur(4px);[m
+[32m+[m[32m            padding: 8px 14px;[m
+[32m+[m[32m            border-radius: 999px;[m
+[32m+[m[32m            font-size: 0.72rem;[m
+[32m+[m[32m            color: rgba(255,255,255,0.85);[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        #heroImg {[m
+[32m+[m[32m            position: absolute;[m
+[32m+[m[32m            top: -10%; left: 0;[m
+[32m+[m[32m            width: 100%;[m
+[32m+[m[32m            height: 120%;[m
+[32m+[m[32m            object-fit: cover;[m
+[32m+[m[32m            z-index: 1;[m
+[32m+[m[32m            will-change: transform;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .hero-overlay {[m
+[32m+[m[32m            position: absolute; inset: 0; z-index: 1;[m
+[32m+[m[32m            background: linear-gradient(180deg, rgba(12,14,26,0.62) 0%, rgba(12,14,26,0.38) 42%, rgba(12,14,26,0.82) 100%);[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .hero-content {[m
+[32m+[m[32m            position: relative;[m
+[32m+[m[32m            z-index: 2;[m
+[32m+[m[32m            max-width: 720px;[m
+[32m+[m[32m            margin: 0 auto;[m
+[32m+[m[32m            text-align: center;[m
+[32m+[m[32m            padding: 160px 24px 120px;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .hero-content h1 {[m
+[32m+[m[32m            font-size: clamp(2.4rem, 1.6rem + 3vw, 4rem);[m
+[32m+[m[32m            font-weight: 700;[m
+[32m+[m[32m            line-height: 1.08;[m
+[32m+[m[32m            margin-bottom: 18px;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .hero-content .tagline {[m
+[32m+[m[32m            font-size: clamp(1rem, 0.9rem + 0.4vw, 1.2rem);[m
+[32m+[m[32m            color: rgba(255,255,255,0.88);[m
+[32m+[m[32m            line-height: 1.6;[m
+[32m+[m[32m            margin-bottom: 36px;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .hero-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; }[m
+[32m+[m[32m        .hero-actions a {[m
+[32m+[m[32m            padding: 13px 28px;[m
+[32m+[m[32m            border-radius: var(--radius-sm);[m
+[32m+[m[32m            text-decoration: none;[m
+[32m+[m[32m            font-weight: 600;[m
+[32m+[m[32m            font-size: 0.98rem;[m
+[32m+[m[32m            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .hero-actions .btn-primary { background: var(--amber); color: var(--indigo-deep); }[m
+[32m+[m[32m        .hero-actions .btn-primary:hover { background: #ffc266; transform: translateY(-1px); }[m
+[32m+[m[32m        .hero-actions .btn-secondary { border: 1.5px solid rgba(255,255,255,0.55); color: #fff; }[m
+[32m+[m[32m        .hero-actions .btn-secondary:hover { border-color: #fff; background: rgba(255,255,255,0.08); }[m
+[32m+[m
+[32m+[m[32m        .scroll-cue {[m
+[32m+[m[32m            position: absolute;[m
+[32m+[m[32m            left: 50%; bottom: 26px;[m
+[32m+[m[32m            transform: translateX(-50%);[m
+[32m+[m[32m            z-index: 2;[m
+[32m+[m[32m            background: none; border: none;[m
+[32m+[m[32m            color: rgba(255,255,255,0.85);[m
+[32m+[m[32m            cursor: pointer;[m
+[32m+[m[32m            animation: cueBounce 2.2s ease-in-out infinite;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .scroll-cue svg { width: 26px; height: 26px; }[m
+[32m+[m[32m        @keyframes cueBounce {[m
+[32m+[m[32m            0%, 100% { transform: translateX(-50%) translateY(0); }[m
+[32m+[m[32m            50% { transform: translateX(-50%) translateY(8px); }[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Fade-in sections ---------- */[m
+[32m+[m[32m        .fade-section {[m
+[32m+[m[32m            opacity: 0;[m
+[32m+[m[32m            transform: translateY(22px);[m
+[32m+[m[32m            transition: opacity 0.65s ease, transform 0.65s ease;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .fade-section.is-visible { opacity: 1; transform: translateY(0); }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Offer sections (SHS / College) ---------- */[m
+[32m+[m[32m        .offers { padding: 96px 40px; background: var(--bg); }[m
+[32m+[m[32m        .offers-alt { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }[m
+[32m+[m
+[32m+[m[32m        .section-head { max-width: 640px; margin-bottom: 44px; }[m
+[32m+[m[32m        .section-head h2 { font-size: clamp(1.8rem, 1.4rem + 1.4vw, 2.35rem); margin-bottom: 10px; }[m
+[32m+[m[32m        .section-head p { color: var(--ink-soft); font-size: 1.03rem; line-height: 1.65; margin: 0; }[m
+[32m+[m
+[32m+[m[32m        .offer-grid {[m
+[32m+[m[32m            display: grid;[m
+[32m+[m[32m            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));[m
+[32m+[m[32m            gap: 24px;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .offer-card {[m
+[32m+[m[32m            background: var(--surface);[m
+[32m+[m[32m            border: 1px solid var(--line);[m
+[32m+[m[32m            border-radius: var(--radius-sm);[m
+[32m+[m[32m            overflow: hidden;[m
+[32m+[m[32m            transition: transform 0.25s ease, box-shadow 0.25s ease;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .offer-card:hover { transform: translateY(-6px); box-shadow: 0 18px 32px rgba(20,23,31,0.12); }[m
+[32m+[m
+[32m+[m[32m        .offer-photo {[m
+[32m+[m[32m            position: relative;[m
+[32m+[m[32m            aspect-ratio: 4 / 3;[m
+[32m+[m[32m            background: linear-gradient(135deg, var(--indigo), var(--indigo-deep));[m
+[32m+[m[32m            overflow: hidden;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .offer-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; }[m
+[32m+[m[32m        .offer-fallback {[m
+[32m+[m[32m            position: absolute; inset: 0; z-index: 1;[m
+[32m+[m[32m            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;[m
+[32m+[m[32m            color: rgba(255,255,255,0.85); text-align: center; padding: 14px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .offer-fallback svg { width: 28px; height: 28px; opacity: 0.9; }[m
+[32m+[m[32m        .offer-fallback span { font-size: 0.68rem; line-height: 1.4; opacity: 0.85; }[m
+[32m+[m
+[32m+[m[32m        .offer-body { padding: 20px 20px 24px; }[m
+[32m+[m[32m        .offer-icon {[m
+[32m+[m[32m            display: inline-flex; width: 38px; height: 38px;[m
+[32m+[m[32m            border-radius: 10px; background: var(--bg);[m
+[32m+[m[32m            align-items: center; justify-content: center;[m
+[32m+[m[32m            color: var(--indigo); margin-bottom: 12px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .offer-icon svg { width: 20px; height: 20px; }[m
+[32m+[m[32m        .offer-body h3 { font-size: 1.12rem; margin: 0 0 8px; color: var(--ink); }[m
+[32m+[m[32m        .offer-body p { margin: 0; color: var(--ink-soft); font-size: 0.92rem; line-height: 1.6; }[m
+[32m+[m
+[32m+[m[32m        /* Certificate banner */[m
+[32m+[m[32m        .cert-banner {[m
+[32m+[m[32m            margin-top: 36px;[m
+[32m+[m[32m            display: flex;[m
+[32m+[m[32m            background: var(--indigo-deep);[m
+[32m+[m[32m            border-radius: var(--radius-lg);[m
+[32m+[m[32m            overflow: hidden;[m
+[32m+[m[32m            color: #fff;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .cert-photo {[m
+[32m+[m[32m            position: relative;[m
+[32m+[m[32m            flex: 0 0 260px;[m
+[32m+[m[32m            background: linear-gradient(135deg, var(--amber), var(--amber-deep));[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .cert-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; }[m
+[32m+[m[32m        .cert-fallback {[m
+[32m+[m[32m            position: absolute; inset: 0; z-index: 1;[m
+[32m+[m[32m            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;[m
+[32m+[m[32m            color: rgba(20,23,31,0.75); text-align: center; padding: 14px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .cert-fallback svg { width: 30px; height: 30px; }[m
+[32m+[m[32m        .cert-fallback span { font-size: 0.68rem; }[m
+[32m+[m[32m        .cert-body { flex: 1; padding: 32px 36px; display: flex; flex-direction: column; justify-content: center; }[m
+[32m+[m[32m        .cert-tag {[m
+[32m+[m[32m            display: inline-block; width: fit-content;[m
+[32m+[m[32m            background: rgba(255,255,255,0.15);[m
+[32m+[m[32m            padding: 4px 12px; border-radius: 999px;[m
+[32m+[m[32m            font-size: 0.76rem; font-weight: 600; margin-bottom: 12px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .cert-body h3 { font-size: 1.35rem; margin: 0 0 10px; }[m
+[32m+[m[32m        .cert-body p { margin: 0; color: #D7DAEA; line-height: 1.6; max-width: 52ch; font-size: 0.96rem; }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Vision & Mission ---------- */[m
+[32m+[m[32m        .pledge { padding: 96px 40px; background: var(--surface); border-top: 1px solid var(--line); }[m
+[32m+[m[32m        .pledge-grid { display: flex; gap: 28px; align-items: stretch; }[m
+[32m+[m
+[32m+[m[32m        .card {[m
+[32m+[m[32m            flex: 1;[m
+[32m+[m[32m            background: var(--surface);[m
+[32m+[m[32m            border: 1px solid var(--line);[m
+[32m+[m[32m            border-top: 4px solid var(--indigo);[m
+[32m+[m[32m            border-radius: var(--radius-sm);[m
+[32m+[m[32m            padding: 30px 30px 32px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .card.mission { border-top-color: var(--amber); }[m
+[32m+[m
+[32m+[m[32m        .card-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }[m
+[32m+[m[32m        .card-head .logo-badge {[m
+[32m+[m[32m            flex: none; width: 48px; height: 48px; border-radius: 12px;[m
+[32m+[m[32m            background: var(--bg); border: 1px solid var(--line);[m
+[32m+[m[32m            display: flex; align-items: center; justify-content: center; overflow: hidden;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .card-head .logo-badge img { width: 30px; height: 30px; object-fit: contain; }[m
+[32m+[m[32m        .card h3 { font-size: 1.3rem; font-weight: 600; color: var(--ink); }[m
+[32m+[m[32m        .card p { color: var(--ink-soft); line-height: 1.7; font-size: 0.98rem; margin: 0; }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Lineup: one photo on top + strand/program list ---------- */[m
+[32m+[m[32m        .lineup { display: block; }[m
+[32m+[m
+[32m+[m[32m        .lineup-photo {[m
+[32m+[m[32m            position: relative;[m
+[32m+[m[32m            width: 100%;[m
+[32m+[m[32m            aspect-ratio: 21 / 9;[m
+[32m+[m[32m            max-height: 420px;[m
+[32m+[m[32m            border-radius: var(--radius-lg);[m
+[32m+[m[32m            overflow: hidden;[m
+[32m+[m[32m            margin-bottom: 30px;[m
+[32m+[m[32m            background: linear-gradient(135deg, var(--indigo), var(--indigo-deep));[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .lineup-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; z-index: 2; }[m
+[32m+[m[32m        .lineup-fallback {[m
+[32m+[m[32m            position: absolute; inset: 0; z-index: 1;[m
+[32m+[m[32m            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;[m
+[32m+[m[32m            color: rgba(255,255,255,0.85); text-align: center; padding: 20px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .lineup-fallback svg { width: 32px; height: 32px; opacity: 0.9; }[m
+[32m+[m[32m        .lineup-fallback span { font-size: 0.74rem; line-height: 1.5; opacity: 0.85; max-width: 32ch; }[m
+[32m+[m
+[32m+[m[32m        .lineup-list {[m
+[32m+[m[32m            list-style: none; margin: 0; padding: 0;[m
+[32m+[m[32m            display: grid;[m
+[32m+[m[32m            grid-template-columns: repeat(auto-fit, minmax(clamp(220px, 40vw, 300px), 1fr));[m
+[32m+[m[32m            gap: 16px;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .lineup-item {[m
+[32m+[m[32m            display: flex;[m
+[32m+[m[32m            gap: 14px;[m
+[32m+[m[32m            min-width: 0;[m
+[32m+[m[32m            background: var(--surface);[m
+[32m+[m[32m            border: 1px solid var(--line);[m
+[32m+[m[32m            border-left: 4px solid var(--indigo);[m
+[32m+[m[32m            border-radius: var(--radius-sm);[m
+[32m+[m[32m            padding: 18px 20px;[m
+[32m+[m[32m            transition: transform 0.2s ease, box-shadow 0.2s ease;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .offers-alt .lineup-item { background: var(--bg); }[m
+[32m+[m[32m        .lineup-item:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(20,23,31,0.09); }[m
+[32m+[m[32m        .lineup-item > div { min-width: 0; }[m
+[32m+[m
+[32m+[m[32m        .lineup-item .ll-icon {[m
+[32m+[m[32m            flex: none; width: 40px; height: 40px; border-radius: 10px;[m
+[32m+[m[32m            background: var(--bg); color: var(--indigo);[m
+[32m+[m[32m            display: flex; align-items: center; justify-content: center;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .offers-alt .lineup-item .ll-icon { background: var(--surface); }[m
+[32m+[m[32m        .lineup-item .ll-icon svg { width: 21px; height: 21px; }[m
+[32m+[m
+[32m+[m[32m        .lineup-item h3 { font-size: 1.05rem; margin: 2px 0 6px; color: var(--ink); overflow-wrap: break-word; }[m
+[32m+[m[32m        .lineup-item p { margin: 0; color: var(--ink-soft); font-size: 0.91rem; line-height: 1.6; overflow-wrap: break-word; }[m
+[32m+[m
+[32m+[m[32m        .ll-tag {[m
+[32m+[m[32m            display: inline-block;[m
+[32m+[m[32m            background: var(--amber);[m
+[32m+[m[32m            color: var(--indigo-deep);[m
+[32m+[m[32m            font-size: 0.68rem;[m
+[32m+[m[32m            font-weight: 700;[m
+[32m+[m[32m            letter-spacing: 0.03em;[m
+[32m+[m[32m            text-transform: uppercase;[m
+[32m+[m[32m            padding: 3px 9px;[m
+[32m+[m[32m            border-radius: 999px;[m
+[32m+[m[32m            margin-bottom: 8px;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Prose sections (History / Philosophy) ---------- */[m
+[32m+[m[32m        .prose-section { padding: 96px 40px; background: var(--surface); border-top: 1px solid var(--line); }[m
+[32m+[m[32m        .prose-section.alt { background: var(--bg); }[m
+[32m+[m
+[32m+[m[32m        .section-head.centered { margin-left: auto; margin-right: auto; text-align: center; }[m
+[32m+[m
+[32m+[m[32m        /* History: portrait photo beside the text on wide screens */[m
+[32m+[m[32m        .prose-layout {[m
+[32m+[m[32m            display: grid;[m
+[32m+[m[32m            grid-template-columns: minmax(0, 300px) minmax(0, 1fr);[m
+[32m+[m[32m            gap: 46px;[m
+[32m+[m[32m            align-items: start;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        /* Philosophy: text only, centred column */[m
+[32m+[m[32m        .prose-layout.solo {[m
+[32m+[m[32m            display: block;[m
+[32m+[m[32m            max-width: 780px;[m
+[32m+[m[32m            margin: 0 auto;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .prose-figure {[m
+[32m+[m[32m            position: relative;[m
+[32m+[m[32m            width: 100%;[m
+[32m+[m[32m            aspect-ratio: 3 / 4;          /* portrait, matches the source photo */[m
+[32m+[m[32m            margin: 0;[m
+[32m+[m[32m            border-radius: var(--radius-lg);[m
+[32m+[m[32m            overflow: hidden;[m
+[32m+[m[32m            background: var(--indigo-deep);[m
+[32m+[m[32m            position: sticky;[m
+[32m+[m[32m            top: 100px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .prose-figure img {[m
+[32m+[m[32m            position: absolute; inset: 0;[m
+[32m+[m[32m            width: 100%; height: 100%;[m
+[32m+[m[32m            object-fit: cover;[m
+[32m+[m[32m            object-position: center top;[m
+[32m+[m[32m            z-index: 2;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .prose-figure figcaption {[m
+[32m+[m[32m            position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;[m
+[32m+[m[32m            background: linear-gradient(180deg, rgba(12,14,26,0), rgba(12,14,26,0.88));[m
+[32m+[m[32m            color: #fff; font-size: 0.82rem; line-height: 1.45;[m
+[32m+[m[32m            padding: 40px 16px 14px;[m
+[32m+[m[32m            text-align: center;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .prose-fallback {[m
+[32m+[m[32m            position: absolute; inset: 0; z-index: 1;[m
+[32m+[m[32m            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;[m
+[32m+[m[32m            color: rgba(255,255,255,0.85); text-align: center; padding: 20px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .prose-fallback svg { width: 30px; height: 30px; opacity: 0.9; }[m
+[32m+[m[32m        .prose-fallback span { font-size: 0.72rem; line-height: 1.5; opacity: 0.85; max-width: 30ch; }[m
+[32m+[m
+[32m+[m[32m        .prose { max-width: 68ch; }[m
+[32m+[m[32m        .prose-layout.solo .prose { max-width: 100%; }[m
+[32m+[m[32m        .prose p { color: var(--ink-soft); line-height: 1.85; font-size: 1rem; margin: 0 0 18px; overflow-wrap: break-word; }[m
+[32m+[m[32m        .prose p:last-child { margin-bottom: 0; }[m
+[32m+[m[32m        .prose .lead { font-size: 1.08rem; color: var(--ink); line-height: 1.75; }[m
+[32m+[m[32m        .prose h3 {[m
+[32m+[m[32m            font-size: 1.2rem; color: var(--ink);[m
+[32m+[m[32m            margin: 34px 0 12px; padding-top: 22px;[m
+[32m+[m[32m            border-top: 1px solid var(--line);[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .prose h3:first-child { margin-top: 0; padding-top: 0; border-top: none; }[m
+[32m+[m
+[32m+[m[32m        .aims { list-style: none; margin: 0; padding: 0; counter-reset: aim; }[m
+[32m+[m[32m        .aims li {[m
+[32m+[m[32m            position: relative;[m
+[32m+[m[32m            counter-increment: aim;[m
+[32m+[m[32m            padding: 0 0 0 44px;[m
+[32m+[m[32m            margin-bottom: 16px;[m
+[32m+[m[32m            color: var(--ink-soft);[m
+[32m+[m[32m            line-height: 1.75;[m
+[32m+[m[32m            font-size: 0.97rem;[m
+[32m+[m[32m            overflow-wrap: break-word;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .aims li::before {[m
+[32m+[m[32m            content: counter(aim);[m
+[32m+[m[32m            position: absolute; left: 0; top: -1px;[m
+[32m+[m[32m            width: 28px; height: 28px; border-radius: 8px;[m
+[32m+[m[32m            background: var(--indigo); color: #fff;[m
+[32m+[m[32m            display: flex; align-items: center; justify-content: center;[m
+[32m+[m[32m            font-family: var(--font-display); font-size: 0.84rem; font-weight: 700;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        .edit-hint {[m
+[32m+[m[32m            display: block;[m
+[32m+[m[32m            margin-top: 8px;[m
+[32m+[m[32m            font-size: 0.78rem;[m
+[32m+[m[32m            color: var(--amber-deep);[m
+[32m+[m[32m            font-style: italic;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        /* ---------- TVL-ICT specializations ---------- */[m
+[32m+[m[32m        .tvl-categories {[m
+[32m+[m[32m            display: grid;[m
+[32m+[m[32m            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));[m
+[32m+[m[32m            gap: 10px;[m
+[32m+[m[32m            margin-top: 14px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .tvl-category {[m
+[32m+[m[32m            padding: 12px 13px;[m
+[32m+[m[32m            background: var(--bg);[m
+[32m+[m[32m            border: 1px solid var(--line);[m
+[32m+[m[32m            border-radius: 8px;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        .offers-alt .tvl-category { background: var(--surface); }[m
+[32m+[m[32m        .tvl-category strong { display: block; color: var(--indigo); font-size: 0.88rem; margin-bottom: 4px; }[m
+[32m+[m[32m        .tvl-category span { display: block; color: var(--ink-soft); font-size: 0.79rem; line-height: 1.4; }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Footer ---------- */[m
+[32m+[m[32m        footer { background: var(--indigo-deep); color: #C7CBE0; text-align: center; padding: 26px 20px; }[m
+[32m+[m[32m        footer p { margin: 0; font-size: 0.9rem; }[m
+[32m+[m[32m        footer a { color: var(--amber); text-decoration: none; font-weight: 600; }[m
+[32m+[m[32m        footer a:hover { text-decoration: underline; }[m
+[32m+[m
+[32m+[m[32m        /* ---------- Responsive ---------- */[m
+[32m+[m[32m        @media (max-width: 1080px) {[m
+[32m+[m[32m            .navbar-inner, .offers, .pledge, .prose-section { padding-left: 32px; padding-right: 32px; }[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        @media (max-width: 860px) {[m
+[32m+[m[32m            .nav-links {[m
+[32m+[m[32m                position: absolute;[m
+[32m+[m[32m                top: 100%;[m
+[32m+[m[32m                left: 0;[m
+[32m+[m[32m                right: 0;[m
+[32m+[m
+[32m+[m[32m                display: flex;[m
+[32m+[m[32m                flex-direction: column;[m
+[32m+[m[32m                align-items: flex-start;[m
+[32m+[m[32m                gap: 4px;[m
+[32m+[m
+[32m+[m[32m                background: var(--indigo-deep);[m
+[32m+[m
+[32m+[m[32m                /* IMPORTANT: no padding while closed */[m
+[32m+[m[32m                padding: 0 24px;[m
+[32m+[m
+[32m+[m[32m                max-height: 0;[m
+[32m+[m[32m                overflow: hidden;[m
+[32m+[m[32m                visibility: hidden;[m
+[32m+[m[32m                opacity: 0;[m
+[32m+[m
+[32m+[m[32m                transition:[m
+[32m+[m[32m                    max-height 0.3s ease,[m
+[32m+[m[32m                    padding 0.3s ease,[m
+[32m+[m[32m                    opacity 0.2s ease,[m
+[32m+[m[32m                    visibility 0.3s ease;[m
+[32m+[m[32m            }[m
+[32m+[m[32m            .nav-links.open {[m
+[32m+[m[32m                max-height: 320px;[m
+[32m+[m[32m                padding: 10px 24px 22px;[m
+[32m+[m[32m                visibility: visible;[m
+[32m+[m[32m                opacity: 1;}[m
+[32m+[m[32m            .nav-links a { width: 100%; padding: 10px 0; }[m
+[32m+[m[32m            .nav-cta { width: 100%; justify-content: center; margin-top: 8px; }[m
+[32m+[m[32m            .nav-toggle { display: inline-flex; }[m
+[32m+[m
+[32m+[m[32m            .cert-banner { flex-direction: column; }[m
+[32m+[m[32m            .cert-photo { flex: none; height: 160px; }[m
+[32m+[m
+[32m+[m[32m            .pledge-grid { flex-direction: column; }[m
+[32m+[m
+[32m+[m[32m            .lineup-photo { aspect-ratio: 16 / 9; }[m
+[32m+[m
+[32m+[m[32m            /* History stacks: portrait photo centred above the text */[m
+[32m+[m[32m            .prose-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; justify-items: center; }[m
+[32m+[m[32m            .prose-figure { position: static; max-width: 300px; }[m
+[32m+[m[32m            .prose-layout > .prose { max-width: 68ch; width: 100%; }[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        @media (max-width: 620px) {[m
+[32m+[m[32m            .navbar-inner { padding: 14px 22px; }[m
+[32m+[m[32m            .hero { margin-top: -68px; }[m
+[32m+[m[32m            .hero-content { padding: 130px 20px 100px; }[m
+[32m+[m
+[32m+[m[32m            .offers, .pledge, .prose-section { padding: 64px 20px; }[m
+[32m+[m[32m            .card { padding: 24px 22px 26px; }[m
+[32m+[m[32m            .lineup-list { grid-template-columns: 1fr; gap: 14px; }[m
+[32m+[m[32m            .lineup-photo { aspect-ratio: 4 / 3; max-height: 300px; margin-bottom: 24px; }[m
+[32m+[m[32m            .prose-figure { max-width: 240px; }[m
+[32m+[m[32m            .prose-figure figcaption { font-size: 0.76rem; padding: 32px 12px 12px; }[m
+[32m+[m[32m            .lineup-item { padding: 16px; }[m
+[32m+[m[32m            .prose h3 { margin-top: 28px; }[m
+         }[m
+     </style>[m
+ </head>[m
+ <body>[m
+[31m-    <h2>Student Assistant Chatbot</h2>[m
+[31m-    <div id="chat-window"></div>[m
+[31m-    <div id="input-area">[m
+[31m-        <input type="text" id="user-input" placeholder="Type your question..." autofocus>[m
+[31m-        <button id="send-button">Send</button>[m
+[31m-    </div>[m
+ [m
+[31m-    <script>[m
+[31m-        const API_URL = "https://faq-assistant-thesis-project.onrender.com/chat";[m
+[32m+[m[32m    <a class="skip-link" href="#shs">Skip to main content</a>[m
+[32m+[m[32m    <div class="scroll-progress" id="scrollProgress"></div>[m
+ [m
+[31m-        let conversationId = null;  // starts null; set after first response[m
+[32m+[m[32m    <!-- Navigation -->[m
+[32m+[m[32m    <header class="navbar" id="siteNav">[m
+[32m+[m[32m        <div class="navbar-inner">[m
+[32m+[m[32m            <a class="brand" href="#top">ACLC Online</a>[m
+ [m
+[31m-        const chatWindow = document.getElementById("chat-window");[m
+[31m-        const userInput = document.getElementById("user-input");[m
+[31m-        const sendButton = document.getElementById("send-button");[m
+[32m+[m[32m            <nav class="nav-links" id="navLinks">[m
+[32m+[m[32m                <a href="#shs">Senior High</a>[m
+[32m+[m[32m                <a href="#college">College</a>[m
+[32m+[m[32m                <a href="#vision">Vision &amp; Mission</a>[m
+[32m+[m[32m                <a href="chatroom.html" class="nav-cta">[m
+[32m+[m[32m                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>[m
+[32m+[m[32m                    Ask ACLC[m
+[32m+[m[32m                </a>[m
+[32m+[m[32m            </nav>[m
+ [m
+[31m-        function addMessage(text, sender) {[m
+[31m-            const div = document.createElement("div");[m
+[31m-            div.className = "message " + (sender === "user" ? "user-message" : "bot-message");[m
+[31m-            div.textContent = text;[m
+[31m-            chatWindow.appendChild(div);[m
+[31m-            chatWindow.scrollTop = chatWindow.scrollHeight;  // auto-scroll to latest[m
+[31m-        }[m
+[32m+[m[32m            <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">[m
+[32m+[m[32m                <svg class="icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>[m
+[32m+[m[32m            </button>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    </header>[m
+[32m+[m
+[32m+[m[32m    <!-- Full-screen hero -->[m
+[32m+[m[32m    <section class="hero" id="top">[m
+[32m+[m[32m        <div class="hero-media">[m
+[32m+[m[32m            <div class="hero-fallback">[m
+[32m+[m[32m                <span class="note">Add your school photo — save as images/campus.jpg</span>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m            <img id="heroImg" src="../images/aclc-campus.png" alt="ACLC campus" onerror="this.style.display='none'">[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m        <div class="hero-overlay"></div>[m
+[32m+[m
+[32m+[m[32m        <div class="hero-content">[m
+[32m+[m[32m            <h1>ACLC Online</h1>[m
+[32m+[m[32m            <p class="tagline">Your questions, answered. Your future, started here.</p>[m
+[32m+[m[32m            <div class="hero-actions">[m
+[32m+[m[32m                <a href="#shs" class="btn-primary">See our programs</a>[m
+[32m+[m[32m                <a href="chatroom.html" class="btn-secondary">Chat with ACLC</a>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <button class="scroll-cue" id="scrollCue" aria-label="Scroll to content">[m
+[32m+[m[32m            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>[m
+[32m+[m[32m        </button>[m
+[32m+[m[32m    </section>[m
+[32m+[m
+[32m+[m[32m    <!-- Senior High School -->[m
+[32m+[m[32m    <section class="offers fade-section" id="shs">[m
+[32m+[m[32m        <div class="section-inner">[m
+[32m+[m[32m            <div class="section-head">[m
+[32m+[m[32m                <h2>Senior High School</h2>[m
+[32m+[m[32m                <p>The academic and technical-vocational strands offered at ACLC. Replace this text and the strand list with your own details.</p>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <div class="lineup">[m
+[32m+[m[32m                <div class="lineup-photo">[m
+[32m+[m[32m                    <div class="lineup-fallback">[m
+[32m+[m[32m                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg>[m
+[32m+[m[32m                        <span>Add one Senior High photo &mdash; save as images/shs/senior-high.jpg</span>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <img src="../images/SHS-1.jpg" alt="ACLC Senior High School students" onerror="this.style.display='none'">[m
+[32m+[m[32m                </div>[m
+[32m+[m
+[32m+[m[32m                <ul class="lineup-list">[m
+[32m+[m[32m                <li class="lineup-item">[m
+[32m+[m[32m                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><ellipse cx="12" cy="12" rx="10" ry="4.2"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(120 12 12)"/></svg></span>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <h3>STEM</h3>[m
+[32m+[m[32m                        <p>Science, Technology, Engineering, and Mathematics — for students headed into engineering, health sciences, or applied sciences.</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m                <li class="lineup-item">[m
+[32m+[m[32m                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <h3>ABM</h3>[m
+[32m+[m[32m                        <p>Accountancy, Business, and Management — for future entrepreneurs, accountants, and business leaders.</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m                <li class="lineup-item">[m
+[32m+[m[32m                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <h3>HUMSS</h3>[m
+[32m+[m[32m                        <p>Humanities and Social Sciences — for students drawn to law, education, psychology, or communication.</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m                <li class="lineup-item">[m
+[32m+[m[32m                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polygon points="15.2 8.8 13 13 8.8 15.2 11 11 15.2 8.8"/></svg></span>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <h3>GAS</h3>[m
+[32m+[m[32m                        <p>General Academic Strand — a flexible mix of subjects for students still deciding on a college path.</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m                <li class="lineup-item">[m
+[32m+[m[32m                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <h3>TVL &ndash; ICT</h3>[m
+[32m+[m[32m                        <p>Technical-Vocational-Livelihood, Information and Communications Technology track — hands-on computer and programming skills.</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m                </ul>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    </section>[m
+[32m+[m
+[32m+[m[32m    <!-- College -->[m
+[32m+[m[32m    <section class="offers offers-alt fade-section" id="college">[m
+[32m+[m[32m        <div class="section-inner">[m
+[32m+[m[32m            <div class="section-head">[m
+[32m+[m[32m                <h2>College Programs</h2>[m
+[32m+[m[32m                <p>The degree and certificate programs offered at ACLC. Replace this text and the program list with your own details.</p>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <div class="lineup">[m
+[32m+[m[32m                <div class="lineup-photo">[m
+[32m+[m[32m                    <div class="lineup-fallback">[m
+[32m+[m[32m                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg>[m
+[32m+[m[32m                        <span>Add one College photo &mdash; save as images/college/college.jpg</span>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <img src="../images/college-1.jpg" alt="ACLC college students" onerror="this.style.display='none'">[m
+[32m+[m[32m                </div>[m
+[32m+[m
+[32m+[m[32m                <ul class="lineup-list">[m
+[32m+[m[32m                <li class="lineup-item">[m
+[32m+[m[32m                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg></span>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <h3>BS Information Technology</h3>[m
+[32m+[m[32m                        <p>A 4-year degree focused on networks, systems, and software for real-world business needs.</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m                <li class="lineup-item">[m
+[32m+[m[32m                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg></span>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <h3>BS Computer Science</h3>[m
+[32m+[m[32m                        <p>A 4-year degree in the theory and practice of computing — algorithms, software, and systems design.</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m                <li class="lineup-item">[m
+[32m+[m[32m                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg></span>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <h3>BS Business Administration</h3>[m
+[32m+[m[32m                        <p>A 4-year degree building management, marketing, and finance skills for business and IT-driven industries.</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m                <li class="lineup-item">[m
+[32m+[m[32m                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="6"/><polyline points="8.2 13.4 7 22 12 19 17 22 15.8 13.4"/></svg></span>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <span class="ll-tag">2-Year Certificate</span>[m
+[32m+[m[32m                        <h3>Associate in Computer Technology (ACT)</h3>[m
+[32m+[m[32m                        <p>A hands-on track for students who want to enter the IT workforce faster with practical, job-ready skills.</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m                </ul>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    </section>[m
+[32m+[m
+[32m+[m[32m    <!-- History -->[m
+[32m+[m[32m    <section class="prose-section fade-section" id="history">[m
+[32m+[m[32m        <div class="section-inner">[m
+[32m+[m[32m            <div class="section-head">[m
+[32m+[m[32m                <h2>History</h2>[m
+[32m+[m[32m                <p>How the school began and how it grew. Replace the paragraphs below with your own text.</p>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <div class="prose-layout">[m
+[32m+[m[32m                <figure class="prose-figure portrait">[m
+[32m+[m[32m                    <div class="prose-fallback">[m
+[32m+[m[32m                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>[m
+[32m+[m[32m                        <span>Add founder photo &mdash; save as images/history/founder.jpg</span>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <img src="../images/founder.jpg" alt="Founder portrait" onerror="this.style.display='none'">[m
+[32m+[m[32m                    <figcaption>Dr. Amable R. Aguiluz V, Founder</figcaption>[m
+[32m+[m[32m                </figure>[m
+[32m+[m
+[32m+[m[32m                <div class="prose">[m
+[32m+[m[32m                    <p class="lead">[Opening paragraph &mdash; type your introduction here. This first paragraph is styled larger so it reads as the lead of the section.]</p>[m
+ [m
+[31m-        async function sendMessage() {[m
+[31m-            const message = userInput.value.trim();[m
+[31m-            if (!message) return;[m
+[32m+[m[32m                    <p>[Paragraph 2 &mdash; type here.]</p>[m
+ [m
+[31m-            addMessage(message, "user");[m
+[31m-            userInput.value = "";[m
+[32m+[m[32m                    <p>[Paragraph 3 &mdash; type here.]</p>[m
+ [m
+[31m-            try {[m
+[31m-                const response = await fetch(API_URL, {[m
+[31m-                    method: "POST",[m
+[31m-                    headers: { "Content-Type": "application/json" },[m
+[31m-                    body: JSON.stringify({[m
+[31m-                        conversation_id: conversationId,[m
+[31m-                        message: message[m
+[31m-                    })[m
+[32m+[m[32m                    <p>[Paragraph 4 &mdash; type here. Copy and paste this line to add as many paragraphs as you need.]</p>[m
+[32m+[m
+[32m+[m[32m                    <span class="edit-hint">Editing note: each paragraph above sits inside its own &lt;p&gt; tag. Delete this hint line when you're done.</span>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    </section>[m
+[32m+[m
+[32m+[m[32m    <!-- Philosophy, Mission Statement & Specific Aims -->[m
+[32m+[m[32m    <section class="prose-section alt fade-section" id="philosophy">[m
+[32m+[m[32m        <div class="section-inner">[m
+[32m+[m[32m            <div class="section-head centered">[m
+[32m+[m[32m                <h2>Philosophy and Mission Statement</h2>[m
+[32m+[m[32m                <p>Education is a lifelong development of human elements within the context of socio-cultural environment in which he lives and operates.</p><br>[m
+[32m+[m[32m                <p>Learner is an individual capable of full acquisitions of self-actualization and productivity through encounters and exposures to various learning conditions.</p><br>[m
+[32m+[m[32m                <p>Teacher is a catalyst who initiates and provides learning process adapted to individual differences of the learners, utilizes effective and modern learning techniques with the ultimate goal of maximizing the learner's potential growth process.</p>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <div class="prose-layout solo">[m
+[32m+[m[32m                <div class="prose">[m
+[32m+[m[32m                    <h3>Specific Aims</h3>[m
+[32m+[m[32m                    <ol class="aims">[m
+[32m+[m[32m                        <li>To provide students  with the necessary knowledge, skills and attitudes through a competency-based curricula necesary for them to be gainfully[m
+[32m+[m[32m                            employed in both local and international companies and organizations.[m
+[32m+[m[32m                        </li>[m
+[32m+[m[32m                        <li>To provide the students with the relevant trainings and tools that will develop and enhance their potentials and skills that match the needs and demands[m
+[32m+[m[32m                            of the industry.[m
+[32m+[m[32m                        </li>[m
+[32m+[m[32m                        <li>To develop in them critical thinking skills and enable them to make informed decisions</li>[m
+[32m+[m[32m                        <li>To instill in them the values of self-respect, honesty, obedience, compassion, punctuality, social responsibility, self-reliance, and self-discipline to be effective[m
+[32m+[m[32m                            professionals and leaders[m
+[32m+[m[32m                        </li>[m
+[32m+[m[32m                        <li>To mold them to become responsible and productive citizens; who are socially responsible and capable of making positive contiribution to the country's development</li>[m
+[32m+[m[32m                    </ol>[m
+[32m+[m
+[32m+[m[32m                    <!-- <span class="edit-hint">Editing note: the numbers are added automatically &mdash; don't type them in. Delete this hint line when you're done.</span> -->[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    </section>[m
+[32m+[m
+[32m+[m[32m    <!-- Vision & Mission -->[m
+[32m+[m[32m    <section class="pledge fade-section" id="vision">[m
+[32m+[m[32m        <div class="section-inner">[m
+[32m+[m[32m            <div class="section-head">[m
+[32m+[m[32m                <h2>Vision &amp; Mission</h2>[m
+[32m+[m[32m                <p>What we're building toward, and how we plan to get there.</p>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <div class="pledge-grid">[m
+[32m+[m[32m                <div class="card vision">[m
+[32m+[m[32m                    <div class="card-head">[m
+[32m+[m[32m                        <span class="logo-badge"><img src="../images/ama-logo.png" alt="AMA logo"></span>[m
+[32m+[m[32m                        <h3>Vision</h3>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <p>To be the leader and dominant provider of relevant globally recognized information technology-based education and related services in the global market, helping its graduates to live happy, fulfilled professional and personal lives.</p>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                <div class="card mission">[m
+[32m+[m[32m                    <div class="card-head">[m
+[32m+[m[32m                        <span class="logo-badge"><img src="../images/ama-logo.png" alt="AMA logo"></span>[m
+[32m+[m[32m                        <h3>Mission</h3>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <p>Provide holistic, relevant, quality and globally recognized IT-based education in all levels and disciplines. We aim to produce world-class professionals and leaders responsive to the need of technology International Community: cognizant of the welfare and benefits of others while realizing their potential as productive members of society for the honor and glory of God Almighty.</p>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    </section>[m
+[32m+[m
+[32m+[m[32m    <!-- Footer -->[m
+[32m+[m[32m    <footer>[m
+[32m+[m[32m        <p>&copy; 2025 ACLC Online | <a href="#">Contact Us</a></p>[m
+[32m+[m[32m    </footer>[m
+[32m+[m
+[32m+[m[32m    <script>[m
+[32m+[m[32m    (function () {[m
+[32m+[m[32m        var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;[m
+[32m+[m
+[32m+[m[32m        /* Mobile nav toggle */[m
+[32m+[m[32m        var toggle = document.getElementById('navToggle');[m
+[32m+[m[32m        var links = document.getElementById('navLinks');[m
+[32m+[m[32m        if (toggle && links) {[m
+[32m+[m[32m            var setOpen = function (open) {[m
+[32m+[m[32m                links.classList.toggle('open', open);[m
+[32m+[m[32m                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');[m
+[32m+[m[32m                toggle.classList.toggle('is-open', open);[m
+[32m+[m[32m            };[m
+[32m+[m[32m            toggle.addEventListener('click', function () {[m
+[32m+[m[32m                setOpen(!links.classList.contains('open'));[m
+[32m+[m[32m            });[m
+[32m+[m[32m            links.querySelectorAll('a').forEach(function (a) {[m
+[32m+[m[32m                a.addEventListener('click', function () { setOpen(false); });[m
+[32m+[m[32m            });[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        /* Solid navbar once hero has scrolled past */[m
+[32m+[m[32m        var nav = document.getElementById('siteNav');[m
+[32m+[m[32m        var hero = document.getElementById('top');[m
+[32m+[m[32m        if (nav && hero && 'IntersectionObserver' in window) {[m
+[32m+[m[32m            new IntersectionObserver(function (entries) {[m
+[32m+[m[32m                entries.forEach(function (entry) {[m
+[32m+[m[32m                    nav.classList.toggle('scrolled', entry.intersectionRatio < 0.6);[m
+                 });[m
+[32m+[m[32m            }, { threshold: [0, 0.6] }).observe(hero);[m
+[32m+[m[32m        }[m
+ [m
+[31m-                if (!response.ok) {[m
+[31m-                    addMessage("Sorry, something went wrong. Please try again.", "bot");[m
+[31m-                    return;[m
+[31m-                }[m
+[32m+[m[32m        /* Scroll progress bar + hero parallax */[m
+[32m+[m[32m        var progress = document.getElementById('scrollProgress');[m
+[32m+[m[32m        var heroImg = document.getElementById('heroImg');[m
+ [m
+[31m-                const data = await response.json();[m
+[31m-                conversationId = data.conversation_id;  // remember for next message[m
+[31m-                addMessage(data.reply, "bot");[m
+[32m+[m[32m        function updateOnScroll() {[m
+[32m+[m[32m            var doc = document.documentElement;[m
+[32m+[m[32m            var scrollTop = doc.scrollTop || document.body.scrollTop;[m
+[32m+[m[32m            var height = doc.scrollHeight - doc.clientHeight;[m
+[32m+[m[32m            var pct = height > 0 ? (scrollTop / height) * 100 : 0;[m
+[32m+[m[32m            if (progress) progress.style.width = pct + '%';[m
+[32m+[m
+[32m+[m[32m            if (heroImg && !reduceMotion) {[m
+[32m+[m[32m                var offset = Math.min(scrollTop * 0.35, 160);[m
+[32m+[m[32m                heroImg.style.transform = 'translateY(' + offset + 'px)';[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+ [m
+[31m-            } catch (error) {[m
+[31m-                addMessage("Could not reach the server. Is the API running?", "bot");[m
+[32m+[m[32m        var ticking = false;[m
+[32m+[m[32m        window.addEventListener('scroll', function () {[m
+[32m+[m[32m            if (!ticking) {[m
+[32m+[m[32m                window.requestAnimationFrame(function () { updateOnScroll(); ticking = false; });[m
+[32m+[m[32m                ticking = true;[m
+             }[m
+[32m+[m[32m        }, { passive: true });[m
+[32m+[m[32m        updateOnScroll();[m
+[32m+[m
+[32m+[m[32m        /* Scroll cue */[m
+[32m+[m[32m        var cue = document.getElementById('scrollCue');[m
+[32m+[m[32m        if (cue) {[m
+[32m+[m[32m            cue.addEventListener('click', function () {[m
+[32m+[m[32m                var target = document.getElementById('shs');[m
+[32m+[m[32m                if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });[m
+[32m+[m[32m            });[m
+         }[m
+ [m
+[31m-        sendButton.addEventListener("click", sendMessage);[m
+[31m-        userInput.addEventListener("keydown", (e) => {[m
+[31m-            if (e.key === "Enter") sendMessage();[m
+[31m-        });[m
+[32m+[m[32m        /* Fade sections in as they enter view */[m
+[32m+[m[32m        var sections = document.querySelectorAll('.fade-section');[m
+[32m+[m[32m        if ('IntersectionObserver' in window) {[m
+[32m+[m[32m            var observer = new IntersectionObserver(function (entries, obs) {[m
+[32m+[m[32m                entries.forEach(function (entry) {[m
+[32m+[m[32m                    if (entry.isIntersecting) {[m
+[32m+[m[32m                        entry.target.classList.add('is-visible');[m
+[32m+[m[32m                        obs.unobserve(entry.target);[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                });[m
+[32m+[m[32m            }, { threshold: 0.15 });[m
+[32m+[m[32m            sections.forEach(function (s) { observer.observe(s); });[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m            sections.forEach(function (s) { s.classList.add('is-visible'); });[m
+[32m+[m[32m        }[m
+[32m+[m[32m    })();[m
+     </script>[m
+[32m+[m
+ </body>[m
+[31m-</html>[m
+[32m+[m[32m</html>[m
+\ No newline at end of file[m

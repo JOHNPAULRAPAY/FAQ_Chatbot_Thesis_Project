@@ -2,120 +2,971 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Student Assistant Chatbot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACLC Online | Home</title>
+    <link rel="icon" href="../images/unnamed.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
     <style>
+        /* ---------- Design tokens ---------- */
+        :root {
+            --bg: #F6F7FB;
+            --surface: #FFFFFF;
+            --ink: #14171F;
+            --ink-soft: #545B70;
+            --indigo: #24337A;
+            --indigo-deep: #161F52;
+            --amber: #F0A63B;
+            --amber-deep: #C97F17;
+            --line: #E3E6F0;
+
+            --font-display: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;
+            --font-body: 'Inter', 'Segoe UI', Arial, sans-serif;
+
+            --max-width: 1180px;
+            --radius-lg: 20px;
+            --radius-sm: 10px;
+        }
+
+        * { box-sizing: border-box; min-width: 0; }
+
+        html, body { overflow-x: hidden; max-width: 100%; }
+
+        html { scroll-behavior: smooth; }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 500px;
-            margin: 40px auto;
-            background: #f4f4f4;
+            margin: 0;
+            font-family: var(--font-body);
+            background: var(--bg);
+            color: var(--ink);
+            -webkit-font-smoothing: antialiased;
         }
-        #chat-window {
-            background: white;
-            border-radius: 8px;
-            height: 400px;
-            overflow-y: auto;
-            padding: 15px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+
+        img { max-width: 100%; display: block; }
+        a { color: inherit; }
+        h1, h2, h3 { font-family: var(--font-display); margin: 0; }
+        button { font-family: inherit; }
+
+        .section-inner { max-width: var(--max-width); margin: 0 auto; }
+        .section-inner.narrow { max-width: 760px; }
+
+        :focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+
+        .skip-link {
+            position: absolute;
+            left: 16px;
+            top: -60px;
+            background: var(--indigo-deep);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            z-index: 3000;
+            text-decoration: none;
+            font-weight: 600;
+            transition: top 0.2s ease;
         }
-        .message {
-            margin: 8px 0;
-            padding: 8px 12px;
-            border-radius: 12px;
-            max-width: 75%;
-            clear: both;
+        .skip-link:focus { top: 16px; }
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            * { transition: none !important; animation: none !important; }
         }
-        .user-message {
-            background: #007bff;
-            color: white;
-            float: right;
+
+        /* ---------- Scroll progress ---------- */
+        .scroll-progress {
+            position: fixed;
+            top: 0; left: 0;
+            height: 3px;
+            width: 0%;
+            background: var(--amber);
+            z-index: 2100;
         }
-        .bot-message {
-            background: #e5e5ea;
-            color: black;
-            float: left;
+
+        /* ---------- Navbar ---------- */
+        .navbar {
+            position: sticky;
+            top: 0;
+            z-index: 2000;
+            background: linear-gradient(180deg, rgba(12,14,26,0.55), rgba(12,14,26,0));
+            backdrop-filter: blur(6px);
+            transition: background 0.3s ease, box-shadow 0.3s ease;
         }
-        #input-area {
+        .navbar.scrolled {
+            background: var(--indigo-deep);
+            backdrop-filter: none;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+        }
+
+        .navbar-inner {
+            position: relative;
             display: flex;
-            margin-top: 10px;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 40px;
+            max-width: var(--max-width);
+            margin: 0 auto;
         }
-        #user-input {
-            flex: 1;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
+
+        .brand {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #fff;
+            text-decoration: none;
+            letter-spacing: 0.01em;
         }
-        #send-button {
+
+        .nav-links { display: flex; align-items: center; gap: 30px; }
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            opacity: 0.92;
+        }
+        .nav-links a:hover { opacity: 1; }
+
+        .nav-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--amber) !important;
+            color: var(--indigo-deep) !important;
             padding: 10px 20px;
-            margin-left: 8px;
+            border-radius: 999px;
+            font-weight: 600 !important;
+            opacity: 1 !important;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+        .nav-cta:hover { background: #ffc266 !important; transform: translateY(-1px); }
+        .nav-cta svg { width: 16px; height: 16px; }
+
+        .nav-toggle {
+            display: none;
+            background: none;
             border: none;
-            background: #007bff;
-            color: white;
-            border-radius: 6px;
+            color: #fff;
             cursor: pointer;
+            padding: 6px;
+        }
+        .nav-toggle svg { width: 26px; height: 26px; }
+        .nav-toggle.is-open { background: rgba(255,255,255,0.14); border-radius: 8px; }
+
+        /* ---------- Hero ---------- */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            min-height: 100svh;
+            display: flex;
+            align-items: flex-end;
+            overflow: hidden;
+            color: #fff;
+            margin-top: -76px; /* sits behind sticky navbar */
+        }
+
+        .hero-media { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+
+        .hero-fallback {
+            position: absolute; inset: 0; z-index: 0;
+            background:
+                radial-gradient(circle at 18% 22%, rgba(255,255,255,0.09), transparent 42%),
+                radial-gradient(circle at 82% 64%, rgba(255,255,255,0.09), transparent 46%),
+                linear-gradient(135deg, var(--indigo), var(--indigo-deep));
+        }
+        .hero-fallback .note {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            background: rgba(255,255,255,0.14);
+            backdrop-filter: blur(4px);
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.85);
+        }
+
+        #heroImg {
+            position: absolute;
+            top: -10%; left: 0;
+            width: 100%;
+            height: 120%;
+            object-fit: cover;
+            z-index: 1;
+            will-change: transform;
+        }
+
+        .hero-overlay {
+            position: absolute; inset: 0; z-index: 1;
+            background: linear-gradient(180deg, rgba(12,14,26,0.62) 0%, rgba(12,14,26,0.38) 42%, rgba(12,14,26,0.82) 100%);
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            max-width: 720px;
+            margin: 0 auto;
+            text-align: center;
+            padding: 160px 24px 120px;
+        }
+
+        .hero-content h1 {
+            font-size: clamp(2.4rem, 1.6rem + 3vw, 4rem);
+            font-weight: 700;
+            line-height: 1.08;
+            margin-bottom: 18px;
+        }
+
+        .hero-content .tagline {
+            font-size: clamp(1rem, 0.9rem + 0.4vw, 1.2rem);
+            color: rgba(255,255,255,0.88);
+            line-height: 1.6;
+            margin-bottom: 36px;
+        }
+
+        .hero-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; }
+        .hero-actions a {
+            padding: 13px 28px;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.98rem;
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+        .hero-actions .btn-primary { background: var(--amber); color: var(--indigo-deep); }
+        .hero-actions .btn-primary:hover { background: #ffc266; transform: translateY(-1px); }
+        .hero-actions .btn-secondary { border: 1.5px solid rgba(255,255,255,0.55); color: #fff; }
+        .hero-actions .btn-secondary:hover { border-color: #fff; background: rgba(255,255,255,0.08); }
+
+        .scroll-cue {
+            position: absolute;
+            left: 50%; bottom: 26px;
+            transform: translateX(-50%);
+            z-index: 2;
+            background: none; border: none;
+            color: rgba(255,255,255,0.85);
+            cursor: pointer;
+            animation: cueBounce 2.2s ease-in-out infinite;
+        }
+        .scroll-cue svg { width: 26px; height: 26px; }
+        @keyframes cueBounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(8px); }
+        }
+
+        /* ---------- Fade-in sections ---------- */
+        .fade-section {
+            opacity: 0;
+            transform: translateY(22px);
+            transition: opacity 0.65s ease, transform 0.65s ease;
+        }
+        .fade-section.is-visible { opacity: 1; transform: translateY(0); }
+
+        /* ---------- Offer sections (SHS / College) ---------- */
+        .offers { padding: 96px 40px; background: var(--bg); }
+        .offers-alt { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+
+        .section-head { max-width: 640px; margin-bottom: 44px; }
+        .section-head h2 { font-size: clamp(1.8rem, 1.4rem + 1.4vw, 2.35rem); margin-bottom: 10px; }
+        .section-head p { color: var(--ink-soft); font-size: 1.03rem; line-height: 1.65; margin: 0; }
+
+        .offer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 24px;
+        }
+
+        .offer-card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .offer-card:hover { transform: translateY(-6px); box-shadow: 0 18px 32px rgba(20,23,31,0.12); }
+
+        .offer-photo {
+            position: relative;
+            aspect-ratio: 4 / 3;
+            background: linear-gradient(135deg, var(--indigo), var(--indigo-deep));
+            overflow: hidden;
+        }
+        .offer-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; }
+        .offer-fallback {
+            position: absolute; inset: 0; z-index: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+            color: rgba(255,255,255,0.85); text-align: center; padding: 14px;
+        }
+        .offer-fallback svg { width: 28px; height: 28px; opacity: 0.9; }
+        .offer-fallback span { font-size: 0.68rem; line-height: 1.4; opacity: 0.85; }
+
+        .offer-body { padding: 20px 20px 24px; }
+        .offer-icon {
+            display: inline-flex; width: 38px; height: 38px;
+            border-radius: 10px; background: var(--bg);
+            align-items: center; justify-content: center;
+            color: var(--indigo); margin-bottom: 12px;
+        }
+        .offer-icon svg { width: 20px; height: 20px; }
+        .offer-body h3 { font-size: 1.12rem; margin: 0 0 8px; color: var(--ink); }
+        .offer-body p { margin: 0; color: var(--ink-soft); font-size: 0.92rem; line-height: 1.6; }
+
+        /* Certificate banner */
+        .cert-banner {
+            margin-top: 36px;
+            display: flex;
+            background: var(--indigo-deep);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            color: #fff;
+        }
+        .cert-photo {
+            position: relative;
+            flex: 0 0 260px;
+            background: linear-gradient(135deg, var(--amber), var(--amber-deep));
+        }
+        .cert-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; }
+        .cert-fallback {
+            position: absolute; inset: 0; z-index: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+            color: rgba(20,23,31,0.75); text-align: center; padding: 14px;
+        }
+        .cert-fallback svg { width: 30px; height: 30px; }
+        .cert-fallback span { font-size: 0.68rem; }
+        .cert-body { flex: 1; padding: 32px 36px; display: flex; flex-direction: column; justify-content: center; }
+        .cert-tag {
+            display: inline-block; width: fit-content;
+            background: rgba(255,255,255,0.15);
+            padding: 4px 12px; border-radius: 999px;
+            font-size: 0.76rem; font-weight: 600; margin-bottom: 12px;
+        }
+        .cert-body h3 { font-size: 1.35rem; margin: 0 0 10px; }
+        .cert-body p { margin: 0; color: #D7DAEA; line-height: 1.6; max-width: 52ch; font-size: 0.96rem; }
+
+        /* ---------- Vision & Mission ---------- */
+        .pledge { padding: 96px 40px; background: var(--surface); border-top: 1px solid var(--line); }
+        .pledge-grid { display: flex; gap: 28px; align-items: stretch; }
+
+        .card {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-top: 4px solid var(--indigo);
+            border-radius: var(--radius-sm);
+            padding: 30px 30px 32px;
+        }
+        .card.mission { border-top-color: var(--amber); }
+
+        .card-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+        .card-head .logo-badge {
+            flex: none; width: 48px; height: 48px; border-radius: 12px;
+            background: var(--bg); border: 1px solid var(--line);
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .card-head .logo-badge img { width: 30px; height: 30px; object-fit: contain; }
+        .card h3 { font-size: 1.3rem; font-weight: 600; color: var(--ink); }
+        .card p { color: var(--ink-soft); line-height: 1.7; font-size: 0.98rem; margin: 0; }
+
+        /* ---------- Lineup: one photo on top + strand/program list ---------- */
+        .lineup { display: block; }
+
+        .lineup-photo {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 21 / 9;
+            max-height: 420px;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--indigo), var(--indigo-deep));
+        }
+        .lineup-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; z-index: 2; }
+        .lineup-fallback {
+            position: absolute; inset: 0; z-index: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+            color: rgba(255,255,255,0.85); text-align: center; padding: 20px;
+        }
+        .lineup-fallback svg { width: 32px; height: 32px; opacity: 0.9; }
+        .lineup-fallback span { font-size: 0.74rem; line-height: 1.5; opacity: 0.85; max-width: 32ch; }
+
+        .lineup-list {
+            list-style: none; margin: 0; padding: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(clamp(220px, 40vw, 300px), 1fr));
+            gap: 16px;
+        }
+
+        .lineup-item {
+            display: flex;
+            gap: 14px;
+            min-width: 0;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-left: 4px solid var(--indigo);
+            border-radius: var(--radius-sm);
+            padding: 18px 20px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .offers-alt .lineup-item { background: var(--bg); }
+        .lineup-item:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(20,23,31,0.09); }
+        .lineup-item > div { min-width: 0; }
+
+        .lineup-item .ll-icon {
+            flex: none; width: 40px; height: 40px; border-radius: 10px;
+            background: var(--bg); color: var(--indigo);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .offers-alt .lineup-item .ll-icon { background: var(--surface); }
+        .lineup-item .ll-icon svg { width: 21px; height: 21px; }
+
+        .lineup-item h3 { font-size: 1.05rem; margin: 2px 0 6px; color: var(--ink); overflow-wrap: break-word; }
+        .lineup-item p { margin: 0; color: var(--ink-soft); font-size: 0.91rem; line-height: 1.6; overflow-wrap: break-word; }
+
+        .ll-tag {
+            display: inline-block;
+            background: var(--amber);
+            color: var(--indigo-deep);
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            padding: 3px 9px;
+            border-radius: 999px;
+            margin-bottom: 8px;
+        }
+
+        /* ---------- Prose sections (History / Philosophy) ---------- */
+        .prose-section { padding: 96px 40px; background: var(--surface); border-top: 1px solid var(--line); }
+        .prose-section.alt { background: var(--bg); }
+
+        .section-head.centered { margin-left: auto; margin-right: auto; text-align: center; }
+
+        /* History: portrait photo beside the text on wide screens */
+        .prose-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+            gap: 46px;
+            align-items: start;
+        }
+
+        /* Philosophy: text only, centred column */
+        .prose-layout.solo {
+            display: block;
+            max-width: 780px;
+            margin: 0 auto;
+        }
+
+        .prose-figure {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 3 / 4;          /* portrait, matches the source photo */
+            margin: 0;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            background: var(--indigo-deep);
+            position: sticky;
+            top: 100px;
+        }
+        .prose-figure img {
+            position: absolute; inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            object-position: center top;
+            z-index: 2;
+        }
+        .prose-figure figcaption {
+            position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+            background: linear-gradient(180deg, rgba(12,14,26,0), rgba(12,14,26,0.88));
+            color: #fff; font-size: 0.82rem; line-height: 1.45;
+            padding: 40px 16px 14px;
+            text-align: center;
+        }
+        .prose-fallback {
+            position: absolute; inset: 0; z-index: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+            color: rgba(255,255,255,0.85); text-align: center; padding: 20px;
+        }
+        .prose-fallback svg { width: 30px; height: 30px; opacity: 0.9; }
+        .prose-fallback span { font-size: 0.72rem; line-height: 1.5; opacity: 0.85; max-width: 30ch; }
+
+        .prose { max-width: 68ch; }
+        .prose-layout.solo .prose { max-width: 100%; }
+        .prose p { color: var(--ink-soft); line-height: 1.85; font-size: 1rem; margin: 0 0 18px; overflow-wrap: break-word; }
+        .prose p:last-child { margin-bottom: 0; }
+        .prose .lead { font-size: 1.08rem; color: var(--ink); line-height: 1.75; }
+        .prose h3 {
+            font-size: 1.2rem; color: var(--ink);
+            margin: 34px 0 12px; padding-top: 22px;
+            border-top: 1px solid var(--line);
+        }
+        .prose h3:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+        .aims { list-style: none; margin: 0; padding: 0; counter-reset: aim; }
+        .aims li {
+            position: relative;
+            counter-increment: aim;
+            padding: 0 0 0 44px;
+            margin-bottom: 16px;
+            color: var(--ink-soft);
+            line-height: 1.75;
+            font-size: 0.97rem;
+            overflow-wrap: break-word;
+        }
+        .aims li::before {
+            content: counter(aim);
+            position: absolute; left: 0; top: -1px;
+            width: 28px; height: 28px; border-radius: 8px;
+            background: var(--indigo); color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-family: var(--font-display); font-size: 0.84rem; font-weight: 700;
+        }
+
+        .edit-hint {
+            display: block;
+            margin-top: 8px;
+            font-size: 0.78rem;
+            color: var(--amber-deep);
+            font-style: italic;
+        }
+
+        /* ---------- TVL-ICT specializations ---------- */
+        .tvl-categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .tvl-category {
+            padding: 12px 13px;
+            background: var(--bg);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+        }
+        .offers-alt .tvl-category { background: var(--surface); }
+        .tvl-category strong { display: block; color: var(--indigo); font-size: 0.88rem; margin-bottom: 4px; }
+        .tvl-category span { display: block; color: var(--ink-soft); font-size: 0.79rem; line-height: 1.4; }
+
+        /* ---------- Footer ---------- */
+        footer { background: var(--indigo-deep); color: #C7CBE0; text-align: center; padding: 26px 20px; }
+        footer p { margin: 0; font-size: 0.9rem; }
+        footer a { color: var(--amber); text-decoration: none; font-weight: 600; }
+        footer a:hover { text-decoration: underline; }
+
+        /* ---------- Responsive ---------- */
+        @media (max-width: 1080px) {
+            .navbar-inner, .offers, .pledge, .prose-section { padding-left: 32px; padding-right: 32px; }
+        }
+
+        @media (max-width: 860px) {
+            .nav-links {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+
+                background: var(--indigo-deep);
+
+                /* IMPORTANT: no padding while closed */
+                padding: 0 24px;
+
+                max-height: 0;
+                overflow: hidden;
+                visibility: hidden;
+                opacity: 0;
+
+                transition:
+                    max-height 0.3s ease,
+                    padding 0.3s ease,
+                    opacity 0.2s ease,
+                    visibility 0.3s ease;
+            }
+            .nav-links.open {
+                max-height: 320px;
+                padding: 10px 24px 22px;
+                visibility: visible;
+                opacity: 1;}
+            .nav-links a { width: 100%; padding: 10px 0; }
+            .nav-cta { width: 100%; justify-content: center; margin-top: 8px; }
+            .nav-toggle { display: inline-flex; }
+
+            .cert-banner { flex-direction: column; }
+            .cert-photo { flex: none; height: 160px; }
+
+            .pledge-grid { flex-direction: column; }
+
+            .lineup-photo { aspect-ratio: 16 / 9; }
+
+            /* History stacks: portrait photo centred above the text */
+            .prose-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; justify-items: center; }
+            .prose-figure { position: static; max-width: 300px; }
+            .prose-layout > .prose { max-width: 68ch; width: 100%; }
+        }
+
+        @media (max-width: 620px) {
+            .navbar-inner { padding: 14px 22px; }
+            .hero { margin-top: -68px; }
+            .hero-content { padding: 130px 20px 100px; }
+
+            .offers, .pledge, .prose-section { padding: 64px 20px; }
+            .card { padding: 24px 22px 26px; }
+            .lineup-list { grid-template-columns: 1fr; gap: 14px; }
+            .lineup-photo { aspect-ratio: 4 / 3; max-height: 300px; margin-bottom: 24px; }
+            .prose-figure { max-width: 240px; }
+            .prose-figure figcaption { font-size: 0.76rem; padding: 32px 12px 12px; }
+            .lineup-item { padding: 16px; }
+            .prose h3 { margin-top: 28px; }
         }
     </style>
 </head>
 <body>
-    <h2>Student Assistant Chatbot</h2>
-    <div id="chat-window"></div>
-    <div id="input-area">
-        <input type="text" id="user-input" placeholder="Type your question..." autofocus>
-        <button id="send-button">Send</button>
-    </div>
+
+    <a class="skip-link" href="#shs">Skip to main content</a>
+    <div class="scroll-progress" id="scrollProgress"></div>
+
+    <!-- Navigation -->
+    <header class="navbar" id="siteNav">
+        <div class="navbar-inner">
+            <a class="brand" href="#top">ACLC Online</a>
+
+            <nav class="nav-links" id="navLinks">
+                <a href="#shs">Senior High</a>
+                <a href="#college">College</a>
+                <a href="#vision">Vision &amp; Mission</a>
+                <a href="chatroom.html" class="nav-cta">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                    Ask ACLC
+                </a>
+            </nav>
+
+            <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+                <svg class="icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Full-screen hero -->
+    <section class="hero" id="top">
+        <div class="hero-media">
+            <div class="hero-fallback">
+                <span class="note">Add your school photo — save as images/campus.jpg</span>
+            </div>
+            <img id="heroImg" src="../images/aclc-campus.png" alt="ACLC campus" onerror="this.style.display='none'">
+        </div>
+        <div class="hero-overlay"></div>
+
+        <div class="hero-content">
+            <h1>ACLC Online</h1>
+            <p class="tagline">Your questions, answered. Your future, started here.</p>
+            <div class="hero-actions">
+                <a href="#shs" class="btn-primary">See our programs</a>
+                <a href="chatroom.html" class="btn-secondary">Chat with ACLC</a>
+            </div>
+        </div>
+
+        <button class="scroll-cue" id="scrollCue" aria-label="Scroll to content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+    </section>
+
+    <!-- Senior High School -->
+    <section class="offers fade-section" id="shs">
+        <div class="section-inner">
+            <div class="section-head">
+                <h2>Senior High School</h2>
+                <p>The academic and technical-vocational strands offered at ACLC. Replace this text and the strand list with your own details.</p>
+            </div>
+
+            <div class="lineup">
+                <div class="lineup-photo">
+                    <div class="lineup-fallback">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg>
+                        <span>Add one Senior High photo &mdash; save as images/shs/senior-high.jpg</span>
+                    </div>
+                    <img src="../images/SHS-1.jpg" alt="ACLC Senior High School students" onerror="this.style.display='none'">
+                </div>
+
+                <ul class="lineup-list">
+                <li class="lineup-item">
+                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><ellipse cx="12" cy="12" rx="10" ry="4.2"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(120 12 12)"/></svg></span>
+                    <div>
+                        <h3>STEM</h3>
+                        <p>Science, Technology, Engineering, and Mathematics — for students headed into engineering, health sciences, or applied sciences.</p>
+                    </div>
+                </li>
+                <li class="lineup-item">
+                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+                    <div>
+                        <h3>ABM</h3>
+                        <p>Accountancy, Business, and Management — for future entrepreneurs, accountants, and business leaders.</p>
+                    </div>
+                </li>
+                <li class="lineup-item">
+                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+                    <div>
+                        <h3>HUMSS</h3>
+                        <p>Humanities and Social Sciences — for students drawn to law, education, psychology, or communication.</p>
+                    </div>
+                </li>
+                <li class="lineup-item">
+                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polygon points="15.2 8.8 13 13 8.8 15.2 11 11 15.2 8.8"/></svg></span>
+                    <div>
+                        <h3>GAS</h3>
+                        <p>General Academic Strand — a flexible mix of subjects for students still deciding on a college path.</p>
+                    </div>
+                </li>
+                <li class="lineup-item">
+                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>
+                    <div>
+                        <h3>TVL &ndash; ICT</h3>
+                        <p>Technical-Vocational-Livelihood, Information and Communications Technology track — hands-on computer and programming skills.</p>
+                    </div>
+                </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- College -->
+    <section class="offers offers-alt fade-section" id="college">
+        <div class="section-inner">
+            <div class="section-head">
+                <h2>College Programs</h2>
+                <p>The degree and certificate programs offered at ACLC. Replace this text and the program list with your own details.</p>
+            </div>
+
+            <div class="lineup">
+                <div class="lineup-photo">
+                    <div class="lineup-fallback">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg>
+                        <span>Add one College photo &mdash; save as images/college/college.jpg</span>
+                    </div>
+                    <img src="../images/college-1.jpg" alt="ACLC college students" onerror="this.style.display='none'">
+                </div>
+
+                <ul class="lineup-list">
+                <li class="lineup-item">
+                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg></span>
+                    <div>
+                        <h3>BS Information Technology</h3>
+                        <p>A 4-year degree focused on networks, systems, and software for real-world business needs.</p>
+                    </div>
+                </li>
+                <li class="lineup-item">
+                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg></span>
+                    <div>
+                        <h3>BS Computer Science</h3>
+                        <p>A 4-year degree in the theory and practice of computing — algorithms, software, and systems design.</p>
+                    </div>
+                </li>
+                <li class="lineup-item">
+                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/></svg></span>
+                    <div>
+                        <h3>BS Business Administration</h3>
+                        <p>A 4-year degree building management, marketing, and finance skills for business and IT-driven industries.</p>
+                    </div>
+                </li>
+                <li class="lineup-item">
+                    <span class="ll-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="6"/><polyline points="8.2 13.4 7 22 12 19 17 22 15.8 13.4"/></svg></span>
+                    <div>
+                        <span class="ll-tag">2-Year Certificate</span>
+                        <h3>Associate in Computer Technology (ACT)</h3>
+                        <p>A hands-on track for students who want to enter the IT workforce faster with practical, job-ready skills.</p>
+                    </div>
+                </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- History -->
+    <section class="prose-section fade-section" id="history">
+        <div class="section-inner">
+            <div class="section-head">
+                <h2>History</h2>
+                <p>How the school began and how it grew. Replace the paragraphs below with your own text.</p>
+            </div>
+
+            <div class="prose-layout">
+                <figure class="prose-figure portrait">
+                    <div class="prose-fallback">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span>Add founder photo &mdash; save as images/history/founder.jpg</span>
+                    </div>
+                    <img src="../images/founder.jpg" alt="Founder portrait" onerror="this.style.display='none'">
+                    <figcaption>Dr. Amable R. Aguiluz V, Founder</figcaption>
+                </figure>
+
+                <div class="prose">
+                    <p class="lead">[Opening paragraph &mdash; type your introduction here. This first paragraph is styled larger so it reads as the lead of the section.]</p>
+
+                    <p>[Paragraph 2 &mdash; type here.]</p>
+
+                    <p>[Paragraph 3 &mdash; type here.]</p>
+
+                    <p>[Paragraph 4 &mdash; type here. Copy and paste this line to add as many paragraphs as you need.]</p>
+
+                    <span class="edit-hint">Editing note: each paragraph above sits inside its own &lt;p&gt; tag. Delete this hint line when you're done.</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Philosophy, Mission Statement & Specific Aims -->
+    <section class="prose-section alt fade-section" id="philosophy">
+        <div class="section-inner">
+            <div class="section-head centered">
+                <h2>Philosophy and Mission Statement</h2>
+                <p>Education is a lifelong development of human elements within the context of socio-cultural environment in which he lives and operates.</p><br>
+                <p>Learner is an individual capable of full acquisitions of self-actualization and productivity through encounters and exposures to various learning conditions.</p><br>
+                <p>Teacher is a catalyst who initiates and provides learning process adapted to individual differences of the learners, utilizes effective and modern learning techniques with the ultimate goal of maximizing the learner's potential growth process.</p>
+            </div>
+
+            <div class="prose-layout solo">
+                <div class="prose">
+                    <h3>Specific Aims</h3>
+                    <ol class="aims">
+                        <li>To provide students  with the necessary knowledge, skills and attitudes through a competency-based curricula necesary for them to be gainfully
+                            employed in both local and international companies and organizations.
+                        </li>
+                        <li>To provide the students with the relevant trainings and tools that will develop and enhance their potentials and skills that match the needs and demands
+                            of the industry.
+                        </li>
+                        <li>To develop in them critical thinking skills and enable them to make informed decisions</li>
+                        <li>To instill in them the values of self-respect, honesty, obedience, compassion, punctuality, social responsibility, self-reliance, and self-discipline to be effective
+                            professionals and leaders
+                        </li>
+                        <li>To mold them to become responsible and productive citizens; who are socially responsible and capable of making positive contiribution to the country's development</li>
+                    </ol>
+
+                    <!-- <span class="edit-hint">Editing note: the numbers are added automatically &mdash; don't type them in. Delete this hint line when you're done.</span> -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Vision & Mission -->
+    <section class="pledge fade-section" id="vision">
+        <div class="section-inner">
+            <div class="section-head">
+                <h2>Vision &amp; Mission</h2>
+                <p>What we're building toward, and how we plan to get there.</p>
+            </div>
+
+            <div class="pledge-grid">
+                <div class="card vision">
+                    <div class="card-head">
+                        <span class="logo-badge"><img src="../images/ama-logo.png" alt="AMA logo"></span>
+                        <h3>Vision</h3>
+                    </div>
+                    <p>To be the leader and dominant provider of relevant globally recognized information technology-based education and related services in the global market, helping its graduates to live happy, fulfilled professional and personal lives.</p>
+                </div>
+                <div class="card mission">
+                    <div class="card-head">
+                        <span class="logo-badge"><img src="../images/ama-logo.png" alt="AMA logo"></span>
+                        <h3>Mission</h3>
+                    </div>
+                    <p>Provide holistic, relevant, quality and globally recognized IT-based education in all levels and disciplines. We aim to produce world-class professionals and leaders responsive to the need of technology International Community: cognizant of the welfare and benefits of others while realizing their potential as productive members of society for the honor and glory of God Almighty.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2025 ACLC Online | <a href="#">Contact Us</a></p>
+    </footer>
 
     <script>
-        const API_URL = "https://faq-assistant-thesis-project.onrender.com/chat";
+    (function () {
+        var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-        let conversationId = null;  // starts null; set after first response
-
-        const chatWindow = document.getElementById("chat-window");
-        const userInput = document.getElementById("user-input");
-        const sendButton = document.getElementById("send-button");
-
-        function addMessage(text, sender) {
-            const div = document.createElement("div");
-            div.className = "message " + (sender === "user" ? "user-message" : "bot-message");
-            div.textContent = text;
-            chatWindow.appendChild(div);
-            chatWindow.scrollTop = chatWindow.scrollHeight;  // auto-scroll to latest
+        /* Mobile nav toggle */
+        var toggle = document.getElementById('navToggle');
+        var links = document.getElementById('navLinks');
+        if (toggle && links) {
+            var setOpen = function (open) {
+                links.classList.toggle('open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                toggle.classList.toggle('is-open', open);
+            };
+            toggle.addEventListener('click', function () {
+                setOpen(!links.classList.contains('open'));
+            });
+            links.querySelectorAll('a').forEach(function (a) {
+                a.addEventListener('click', function () { setOpen(false); });
+            });
         }
 
-        async function sendMessage() {
-            const message = userInput.value.trim();
-            if (!message) return;
-
-            addMessage(message, "user");
-            userInput.value = "";
-
-            try {
-                const response = await fetch(API_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        conversation_id: conversationId,
-                        message: message
-                    })
+        /* Solid navbar once hero has scrolled past */
+        var nav = document.getElementById('siteNav');
+        var hero = document.getElementById('top');
+        if (nav && hero && 'IntersectionObserver' in window) {
+            new IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) {
+                    nav.classList.toggle('scrolled', entry.intersectionRatio < 0.6);
                 });
+            }, { threshold: [0, 0.6] }).observe(hero);
+        }
 
-                if (!response.ok) {
-                    addMessage("Sorry, something went wrong. Please try again.", "bot");
-                    return;
-                }
+        /* Scroll progress bar + hero parallax */
+        var progress = document.getElementById('scrollProgress');
+        var heroImg = document.getElementById('heroImg');
 
-                const data = await response.json();
-                conversationId = data.conversation_id;  // remember for next message
-                addMessage(data.reply, "bot");
+        function updateOnScroll() {
+            var doc = document.documentElement;
+            var scrollTop = doc.scrollTop || document.body.scrollTop;
+            var height = doc.scrollHeight - doc.clientHeight;
+            var pct = height > 0 ? (scrollTop / height) * 100 : 0;
+            if (progress) progress.style.width = pct + '%';
 
-            } catch (error) {
-                addMessage("Could not reach the server. Is the API running?", "bot");
+            if (heroImg && !reduceMotion) {
+                var offset = Math.min(scrollTop * 0.35, 160);
+                heroImg.style.transform = 'translateY(' + offset + 'px)';
             }
         }
 
-        sendButton.addEventListener("click", sendMessage);
-        userInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") sendMessage();
-        });
+        var ticking = false;
+        window.addEventListener('scroll', function () {
+            if (!ticking) {
+                window.requestAnimationFrame(function () { updateOnScroll(); ticking = false; });
+                ticking = true;
+            }
+        }, { passive: true });
+        updateOnScroll();
+
+        /* Scroll cue */
+        var cue = document.getElementById('scrollCue');
+        if (cue) {
+            cue.addEventListener('click', function () {
+                var target = document.getElementById('shs');
+                if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
+            });
+        }
+
+        /* Fade sections in as they enter view */
+        var sections = document.querySelectorAll('.fade-section');
+        if ('IntersectionObserver' in window) {
+            var observer = new IntersectionObserver(function (entries, obs) {
+                entries.forEach(function (entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.15 });
+            sections.forEach(function (s) { observer.observe(s); });
+        } else {
+            sections.forEach(function (s) { s.classList.add('is-visible'); });
+        }
+    })();
     </script>
+
 </body>
 </html>
